@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Visualizando paciente</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <h1>👁️ Visualização do Paciente</h1>
+  <p id="nomePaciente">Carregando paciente...</p>
+
+  <div class="pastas-container">
+    <div class="pasta" onclick="abrirPasta('resumo')">📄 Resumo</div>
+    <div class="pasta" onclick="abrirPasta('prontuarios')">📒 Prontuários</div>
+    <div class="pasta" onclick="abrirPasta('exames')">🧪 Exames</div>
+    <div class="pasta" onclick="abrirPasta('tratamentos')">💊 Tratamentos</div>
+    <div class="pasta" onclick="abrirPasta('documentos')">📁 Documentos</div>
+  </div>
+
+  <button class="btn-consultas" onclick="abrirCalendario()">📅 Ver consultas do paciente</button>
+
+  <div id="botoes-administrar">
+    <h3>Gerenciar Pastas</h3>
+    <button onclick="novoArquivo()">➕ Criar novo arquivo</button>
+    <button onclick="adicionarArquivoExistente()">📎 Adicionar arquivo existente</button>
+  </div>
+
+  <script src="firebase-config.js"></script>
+  <script src="script.js"></script>
+  <script>
+    const id = localStorage.getItem("pacienteSelecionado");
+    document.getElementById("nomePaciente").innerText = "Visualizando: " + id;
+
+    function abrirPasta(pasta) {
+      alert(`Abrindo pasta '${pasta}' do paciente: ` + id);
+      // depois conectar ao Firestore
+    }
+
+    function abrirCalendario() {
+      alert("Abrindo calendário do paciente: " + id);
+    }
+
+    function novoArquivo() {
+      alert("Criar novo arquivo para o paciente: " + id);
+    }
+
+    function adicionarArquivoExistente() {
+      alert("Anexar arquivo existente para o paciente: " + id);
+    }
+  </script>
+</body>
+</html>

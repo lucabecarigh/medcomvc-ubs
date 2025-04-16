@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Área do Médico</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <h1>👨‍⚕️ Meus Pacientes</h1>
+
+  <div id="lista-pacientes">
+    <!-- Aqui vamos listar os pacientes via JS + Firebase -->
+  </div>
+
+  <button class="btn-consultas" onclick="abrirCalendario()">📅 Ver todas as consultas</button>
+  <button class="btn-consultas" onclick="abrirModalNovoPaciente()">➕ Adicionar novo paciente</button>
+  
+  <div id="modalNovoPaciente" class="modal" style="display:none;">
+    <div class="modal-content">
+      <h2>Novo Paciente</h2>
+      <input type="text" id="novo-nome" placeholder="Nome" />
+      <input type="text" id="novo-sobrenome" placeholder="Sobrenome" />
+      <input type="number" id="novo-idade" placeholder="Idade" />
+      <input type="text" id="novo-cidade" placeholder="Cidade" />
+      <input type="text" id="novo-estado" placeholder="Estado" />
+      <button onclick="salvarNovoPaciente()">Salvar</button>
+      <button onclick="fecharModalNovoPaciente()">Cancelar</button>
+    </div>
+  </div>
+
+  <script src="firebase-config.js"></script>
+  <script src="script.js"></script>
+
+  <script>
+    function abrirCalendario() {
+      alert("Exibir calendário com todas as consultas.");
+      // aqui pode abrir uma página com a agenda futura
+    }
+
+    async function listarPacientes() {
+    const container = document.getElementById('lista-pacientes');
+    container.innerHTML = "<p>Carregando pacientes...</p>";
+
+    // Simulação (depois pegaremos do Firebase)
+    const pacientes = [
+      { nome: 'Leonardo', sobrenome: 'Starace', idade: 29, id: 'leonardostarace' },
+      { nome: 'Maria', sobrenome: 'Clara', idade: 35, id: 'mariaclara' },
+    ];
+
+    container.innerHTML = "";
+    pacientes.forEach(p => {
+      const div = document.createElement('div');
+      div.classList.add('pasta');
+      div.innerText = `${p.nome} ${p.sobrenome} - ${p.idade} anos`;
+      div.onclick = () => {
+        // salvar o ID do paciente para usar na próxima página
+        localStorage.setItem("pacienteSelecionado", p.id);
+        window.location.href = 'paciente_view.html';
+      };
+      container.appendChild(div);
+    });
+  }
+
+  listarPacientes();
+  </script>
+</body>
+</html>

@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Login - Prontuário</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <h1>Bem-vindo ao Prontuário Online</h1>
+  <p>Escolha seu tipo de acesso:</p>
+
+  <div class="login-container">
+    <button onclick="entrarComo('paciente')" class="btn-login">👤 Sou Paciente</button>
+    <button onclick="entrarComo('medico')" class="btn-login">🩺 Sou Médico</button>
+  </div>
+
+  <script>
+    function entrarComo(tipo) {
+      if (tipo === 'paciente') {
+        window.location.href = 'paciente.html';
+      } else {
+        window.location.href = 'medico.html';
+      }
+    }
+  </script>
+</body>
+</html>
