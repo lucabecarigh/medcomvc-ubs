@@ -44,9 +44,9 @@
 
         // Criar documento na coleção "pacientes"
         await setDoc(doc(db, "pacientes", uid), {
-          criadoEm: new Date().toISOString()
+          criadoEm: new Date().toISOString(),
           calendario: [],
-          identificacao: [email: email],
+          identificacao: [email],
           meusmedicos: [],
           resumo: [],
           prontuario: [],
