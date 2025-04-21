@@ -1,8 +1,13 @@
 console.log("Script funcionando!");
+
 function abrirPasta(nome) {
-    alert("Abrir pasta: " + nome);
-    // futuramente vamos redirecionar para uma página real
+  const pacienteId = localStorage.getItem("pacienteSelecionado");
+  if (!pacienteId) {
+    alert("Paciente não selecionado.");
+    return;
   }
+  window.location.href = `pasta.html?pasta=${nome}&id=${pacienteId}`;
+}
   
   function verConsultas() {
     alert("Você tem 2 consultas marcadas esta semana!");
@@ -69,3 +74,43 @@ function abrirPasta(nome) {
       alert("Erro ao criar paciente.");
     }
   }
+
+import { doc, getDoc } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
+import { db } from "./firebase-config.js";
+
+async function abrirPasta(nome) {
+  const pacienteId = localStorage.getItem("pacienteSelecionado");
+
+  if (!pacienteId) {
+    alert("Paciente não selecionado!");
+    return;
+  }
+
+  try {
+    const docRef = doc(db, "pacientes", pacienteId);
+    const docSnap = await getDoc(docRef);
+
+    if (docSnap.exists()) {
+      const dados = docSnap.data();
+      const pasta = dados[nome];
+
+      if (pasta && Array.isArray(pasta)) {
+        console.log(`Conteúdo da pasta ${nome}:`, pasta);
+        alert(`Abrindo pasta ${nome} do paciente ${pacienteId}. Tem ${pasta.length} item(ns).`);
+        // aqui você pode redirecionar para uma nova página ou exibir em modal
+      } else {
+        alert(`Pasta '${nome}' está vazia ou não existe ainda.`);
+      }
+
+    } else {
+      alert("Paciente não encontrado.");
+    }
+  } catch (error) {
+    console.error("Erro ao buscar dados:", error);
+    alert("Erro ao abrir a pasta.");
+  }
+}
+
+function verConsultas() {
+  abrirPasta("calendario");
+}

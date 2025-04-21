@@ -1,73 +1,18 @@
+// firebase-config.js
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
 import { getFirestore } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
 
 const firebaseConfig = {
-  apiKey: "SUA_API_KEY",
-  authDomain: "medcomvc-usb.firebaseapp.com",
-  projectId: "medcomvc-usb",
-  storageBucket: "medcomvc-usb.appspot.com",
-  messagingSenderId: "XXXX",
-  appId: "XXXX"
+  apiKey: "AIzaSyAmF5FS_ekWW_7-1RUHtGCR71LH6r9fg08",
+  authDomain: "medcomvc-ubs.firebaseapp.com",
+  projectId: "medcomvc-ubs",
+  storageBucket: "medcomvc-ubs.appspot.com",
+  messagingSenderId: "313420248004",
+  appId: "1:313420248004:web:a9a28d97b3ef2e33c36a91",
+  measurementId: "G-04YK0WXT42"
 };
 
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
-window.db = db;
 
-import {
-    doc,
-    setDoc,
-    collection
-  } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
-  
-  async function criarPaciente() {
-    const pacienteId = "leonardostarace";
-    const medicoId = "drjose";
-  
-    const dadosPaciente = {
-      nome: "Leonardo",
-      sobrenome: "Starace",
-      idade: 29,
-      cidade: "São Paulo",
-      estado: "SP",
-      medicoId: medicoId
-    };
-  
-    await setDoc(doc(db, "pacientes", pacienteId), dadosPaciente);
-  
-    // Cria subcoleções vazias (pastas)
-    const pastas = ['resumo', 'prontuarios', 'exames', 'tratamentos', 'documentos'];
-    for (const pasta of pastas) {
-      await setDoc(doc(db, "pacientes", pacienteId, pasta, "placeholder"), { vazio: true });
-    }
-  
-    // Atualiza o médico com esse paciente
-    await setDoc(doc(db, "medicos", medicoId, "pacientes", pacienteId), {
-      pacienteId: pacienteId
-    });
-  }
-
-import {
-    getDocs,
-    collection
-  } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
-  
-  async function listarPacientesDoMedico(medicoId) {
-    const querySnapshot = await getDocs(collection(db, "medicos", medicoId, "pacientes"));
-    const ids = [];
-  
-    querySnapshot.forEach((doc) => {
-      ids.push(doc.id);
-    });
-  
-    return ids;
-  }
-
-import { addDoc, collection } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
-
-async function adicionarResumo(pacienteId, conteudo) {
-  await addDoc(collection(db, "pacientes", pacienteId, "resumo"), {
-    data: new Date(),
-    texto: conteudo
-  });
-}
+export { db };
