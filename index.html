@@ -10,8 +10,14 @@
   <h1>Login no Prontuário Online</h1>
 
   <div class="login-container">
+    <select id="tipo-usuario">
+      <option value="pacientes">Sou Paciente</option>
+      <option value="medicos">Sou Médico</option>
+    </select>
+
     <input type="email" id="email" placeholder="Digite seu e-mail" />
     <input type="password" id="senha" placeholder="Digite sua senha" />
+
     <button onclick="fazerLogin()" class="btn-login">Entrar</button>
     <button onclick="window.location.assign('cadastro.html')" class="btn-login">Criar novo usuário</button>
     <button onclick="esqueciSenha()" class="btn-consultas">Esqueci minha senha</button>
@@ -39,27 +45,33 @@
     async function fazerLogin() {
       const email = document.getElementById("email").value;
       const senha = document.getElementById("senha").value;
+      const tipo = document.getElementById("tipo-usuario").value;
+
+      if (!email || !senha) {
+        alert("Preencha o e-mail e a senha.");
+        return;
+      }
 
       try {
         const userCredential = await signInWithEmailAndPassword(auth, email, senha);
         const uid = userCredential.user.uid;
+
         localStorage.setItem("uid", uid);
 
-        const docMedico = await getDoc(doc(db, "medicos", uid));
-        if (docMedico.exists()) {
-          window.location.href = "medico.html";
-          return;
+        const docRef = await getDoc(doc(db, tipo, uid));
+
+        if (docRef.exists()) {
+          if (tipo === "medicos") {
+            window.location.href = "medico.html";
+          } else {
+            window.location.href = "paciente.html";
+          }
+        } else {
+          alert("Usuário não está registrado como " + (tipo === "medicos" ? "médico" : "paciente") + ".");
         }
 
-        const docPaciente = await getDoc(doc(db, "pacientes", uid));
-        if (docPaciente.exists()) {
-          window.location.href = "paciente.html";
-          return;
-        }
-
-        alert("Usuário autenticado, mas não está na coleção de médicos nem de pacientes.");
       } catch (error) {
-        console.error("Erro ao fazer login:", error);
+        console.error("Erro no login:", error);
         alert("Email ou senha incorretos.");
       }
     }
