@@ -45,14 +45,14 @@
         // Criar documento na coleção "pacientes"
         await setDoc(doc(db, "pacientes", uid), {
           criadoEm: new Date().toISOString(),
-          calendario: [],
-          identificacao: [email],
-          meusmedicos: [],
-          resumo: [],
-          prontuario: [],
-          tratamento: [],
-          exame: [],
-          documento: []
+          calendario: [{}],
+          identificacao: [{email: email}],
+          meusmedicos: [{}],
+          resumo: [{}],
+          prontuario: [{}],
+          tratamento: [{}],
+          exame: [{}],
+          documento: [{}]
         });
 
         // Criar documento na coleção "medicos" com arrays vazias
