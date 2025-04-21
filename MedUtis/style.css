@@ -1,110 +1,143 @@
 /* Reset básico */
 body {
-    margin: 0;
-    font-family: Arial, sans-serif;
-  }
-  
-  /* Layout principal:
-     .app contém sidebar + main */
-  .app {
-    display: flex;
-    height: 100vh;
-  }
-  
-  /* SIDEBAR */
-  .sidebar {
-    width: 300px;
-    background-color: #f0f0f0;
-    padding: 20px;
-    box-sizing: border-box;
-    border-right: 1px solid #ccc;
-    overflow-y: auto;
-  }
-  
-  .sidebar h2 {
-    margin-top: 0;
-  }
-  
-  .sidebar input {
-    width: 100%;
-    margin: 10px 0;
-    padding: 10px;
-    box-sizing: border-box;
-  }
-  
-  /* Área que contém os botões de troca de tela */
-  .tools {
-    margin-bottom: 15px;
-  }
-  
-  .tools button {
-    width: 100%;
-    margin-bottom: 8px;
-    padding: 10px;
-    font-size: 1em;
-    background-color: #dbeafe;
-    border: none;
-    border-radius: 6px;
-    cursor: pointer;
-    text-align: left;
-  }
-  
-  .tools button:hover {
-    background-color: #bfdbfe;
-  }
-  
-  /* Lista de medicamentos (posologias) */
-  #medList {
-    list-style: none;
-    padding: 0;
-    margin: 0;
-  }
-  
-  /* Cada item da lista */
-  #medList li {
-    background-color: #e8f0fe;
-    margin-bottom: 8px;
-    padding: 10px;
-    border-radius: 6px;
-    cursor: pointer;
-    position: relative;           /* necessário para .action-icons ficar posicionado */
-    transition: background-color 0.2s ease;
-  }
-  
-  #medList li:hover {
-    background-color: #dbeafe;
-  }
-  
-  /* Ícones de ação (editar/excluir) que ficam à direita do li */
-  .action-icons {
-    position: absolute;
-    top: 5px;
-    right: 8px;
-    display: flex;
-    gap: 8px;
-    opacity: 0;                   /* escondidos por padrão */
-    transition: opacity 0.2s ease;
-  }
-  
-  /* Ao passar o mouse no item, os ícones aparecem */
-  #medList li:hover .action-icons {
-    opacity: 1;
-  }
-  
-  .action-icons span {
-    cursor: pointer;
-    font-weight: bold;
-    font-size: 14px;
-    padding: 2px 5px;
-    border-radius: 4px;
-    background-color: #ffffffcc;
-  }
-  
-  /* MAIN (onde ficam os painéis de adicionar e prescrição) */
-  .main {
-    flex: 1;
-    padding: 40px;
-    box-sizing: border-box;
-  }
-  
-  /* Painéis: o script alterna display entre "block*
+  margin: 0;
+  font-family: Arial, sans-serif;
+}
+
+/* Layout principal:
+   .app contém sidebar + main */
+.app {
+  display: flex;
+  height: 100vh;
+}
+
+/* SIDEBAR */
+.sidebar {
+  width: 300px;
+  background-color: #f0f0f0;
+  padding: 20px;
+  box-sizing: border-box;
+  border-right: 1px solid #ccc;
+  overflow-y: auto;
+}
+
+.sidebar h2 {
+  margin-top: 0;
+}
+
+.sidebar input {
+  width: 100%;
+  margin: 10px 0;
+  padding: 10px;
+  box-sizing: border-box;
+}
+
+/* Área que contém os botões de troca de tela */
+.tools {
+  margin-bottom: 15px;
+}
+
+.tools button {
+  width: 100%;
+  margin-bottom: 8px;
+  padding: 10px;
+  font-size: 1em;
+  background-color: #dbeafe;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  text-align: left;
+}
+
+.tools button:hover {
+  background-color: #bfdbfe;
+}
+
+/* Lista de medicamentos (posologias) */
+#medList {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+/* Cada item da lista */
+#medList li {
+  background-color: #e8f0fe;
+  margin-bottom: 8px;
+  padding: 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  position: relative; /* necessário para .action-icons ficar posicionado */
+  transition: background-color 0.2s ease;
+}
+
+#medList li:hover {
+  background-color: #dbeafe;
+}
+
+/* Ícones de ação (editar/excluir) que ficam à direita do li */
+.action-icons {
+  position: absolute;
+  top: 5px;
+  right: 8px;
+  display: flex;
+  gap: 8px;
+  opacity: 0; /* escondidos por padrão */
+  transition: opacity 0.2s ease;
+}
+
+/* Ao passar o mouse no item, os ícones aparecem */
+#medList li:hover .action-icons {
+  opacity: 1;
+}
+
+.action-icons span {
+  cursor: pointer;
+  font-weight: bold;
+  font-size: 14px;
+  padding: 2px 5px;
+  border-radius: 4px;
+  background-color: #ffffffcc;
+}
+
+/* MAIN (onde ficam os painéis de adicionar e prescrição) */
+.main {
+  flex: 1;
+  padding: 40px;
+  box-sizing: border-box;
+}
+
+/* NEW RULES: stack fields in #addPanel as a column */
+#addPanel select,
+#addPanel input[type="text"] {
+  display: block;      /* force each onto its own line */
+  width: 100%;         /* fill available width */
+  margin-bottom: 15px; /* spacing between fields */
+  padding: 10px;
+  box-sizing: border-box;
+}
+
+/* Buttons in #addPanel as block, or you can group them side-by-side if you prefer */
+#addPanel button {
+  display: block;
+  width: 100%;
+  margin-bottom: 15px;
+  padding: 10px;
+  box-sizing: border-box;
+  border: none;
+  border-radius: 6px;
+  background-color: #dbeafe;
+  cursor: pointer;
+  font-size: 1em;
+}
+
+#addPanel button:hover {
+  background-color: #bfdbfe;
+}
+
+.inline-row {
+  display: flex;         /* places children in a row */
+  flex-wrap: column;     /* prevents wrapping onto new lines */
+  gap: 10px;             /* space between items */
+  align-items: center;   /* vertically center them */
+}
