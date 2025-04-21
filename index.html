@@ -7,20 +7,98 @@
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
-  <h1>Bem-vindo ao Prontuário Online</h1>
-  <p>Escolha seu tipo de acesso:</p>
+  <h1>Login no Prontuário Online</h1>
 
   <div class="login-container">
-    <button onclick="entrarComo('paciente')" class="btn-login">👤 Sou Paciente</button>
-    <button onclick="entrarComo('medico')" class="btn-login">🩺 Sou Médico</button>
+    <input type="email" id="email" placeholder="Digite seu e-mail" />
+    <input type="password" id="senha" placeholder="Digite sua senha" />
+    <button onclick="fazerLogin()" class="btn-login">Entrar</button>
+    <button onclick="mostrarCadastro()" class="btn-login">Criar novo usuário</button>
   </div>
 
-  <script>
-    function entrarComo(tipo) {
-      if (tipo === 'paciente') {
-        window.location.href = 'paciente.html';
-      } else {
-        window.location.href = 'medico.html';
+  <div id="cadastro-container" style="display:none; margin-top: 30px;">
+    <h2>Cadastro de Novo Usuário</h2>
+    <input type="email" id="cadastro-email" placeholder="Novo e-mail" />
+    <input type="password" id="cadastro-senha" placeholder="Nova senha" />
+    <button onclick="cadastrarUsuario()" class="btn-login">Cadastrar</button>
+  </div>
+
+  <!-- Firebase SDKs -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
+    import { getFirestore, doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
+    import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-auth.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyAmF5FS_ekWW_7-1RUHtGCR71LH6r9fg08",
+      authDomain: "medcomvc-ubs.firebaseapp.com",
+      projectId: "medcomvc-ubs",
+      storageBucket: "medcomvc-ubs.appspot.com",
+      messagingSenderId: "313420248004",
+      appId: "1:313420248004:web:a9a28d97b3ef2e33c36a91",
+      measurementId: "G-04YK0WXT42"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+    const auth = getAuth(app);
+
+    async function fazerLogin() {
+      const email = document.getElementById("email").value;
+      const senha = document.getElementById("senha").value;
+
+      try {
+        const userCredential = await signInWithEmailAndPassword(auth, email, senha);
+        const uid = userCredential.user.uid;
+
+        const docMedico = await getDoc(doc(db, "medicos", uid));
+        if (docMedico.exists()) {
+          window.location.href = "medico.html";
+          return;
+        }
+
+        const docPaciente = await getDoc(doc(db, "pacientes", uid));
+        if (docPaciente.exists()) {
+          window.location.href = "paciente.html";
+          return;
+        }
+
+        alert("Usuário não está cadastrado como médico nem como paciente.");
+      } catch (error) {
+        console.error("Erro ao fazer login:", error);
+        alert("Email ou senha incorretos.");
+      }
+    }
+
+    function mostrarCadastro() {
+      document.getElementById("cadastro-container").style.display = "block";
+    }
+
+    async function cadastrarUsuario() {
+      const email = document.getElementById("cadastro-email").value;
+      const senha = document.getElementById("cadastro-senha").value;
+
+      try {
+        const userCredential = await createUserWithEmailAndPassword(auth, email, senha);
+        const uid = userCredential.user.uid;
+
+        // Cria documento do paciente com UID como ID
+        await setDoc(doc(db, "pacientes", uid), {
+          email: email,
+          criadoEm: new Date().toISOString()
+        });
+
+        // Cria as subpastas padrão do paciente
+        const pastas = ['resumo', 'prontuarios', 'exames', 'tratamentos', 'documentos', 'calendario'];
+        for (const pasta of pastas) {
+          await setDoc(doc(db, "pacientes", uid, pasta, "placeholder"), { vazio: true });
+        }
+
+        alert("Usuário cadastrado com sucesso!");
+        document.getElementById("cadastro-container").style.display = "none";
+      } catch (error) {
+        console.error("Erro ao cadastrar:", error);
+        alert("Erro ao cadastrar: " + error.message);
       }
     }
   </script>
