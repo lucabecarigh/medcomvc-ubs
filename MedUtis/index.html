@@ -20,33 +20,51 @@
     </div>
 
     <div class="main">
-      <div id="addPanel" class="panel">
-        <h1>Adicionar nova posologia</h1>
-        <select id="medVia">
-          <option value="oral">Oral</option>
-          <option value="ev">Endovenosa (EV)</option>
-          <option value="im">Intramuscular (IM)</option>
-          <option value="sc">Subcutânea (SC)</option>
-          <option value="inalatoria">Inalatória</option>
-          <option value="topica">Tópica</option>
-          <option value="retal">Retal</option>
-          <option value="nasal">Nasal</option>
-          <option value="sublingual">Sublingual</option>
-        </select>
-        <input type="text" id="medName" placeholder="Nome do medicamento" />
-        <input type="text" id="medDose" placeholder="Posologia" />
-        <input type="text" id="medQuantidade" placeholder="Quantidade (ex: 30 comp, 1 ampola)" />
-        <!-- Botão que chama addMed() -->
-        <button onclick="addMed()">Adicionar</button>
-        <button id="cancelEdit" onclick="clearForm()" style="display: none;">Cancelar</button>
-      </div>
+<!-- "Adicionar nova posologia" panel with form-group structure -->
+<!-- In your index.html (inside the .main or wherever you had #addPanel) -->
+<div id="addPanel" class="panel form-container">
+  <h1>Adicionar nova posologia</h1>
+<div class="inline-row">
+  <div class="form-group">
+    <label for="medVia">Via de administração:</label>
+    <select id="medVia">
+      <option value="oral">Oral</option>
+      <option value="ev">Endovenosa (EV)</option>
+      <option value="im">Intramuscular (IM)</option>
+      <option value="sc">Subcutânea (SC)</option>
+      <option value="inalatoria">Inalatória</option>
+      <option value="topica">Tópica</option>
+      <option value="retal">Retal</option>
+      <option value="nasal">Nasal</option>
+      <option value="sublingual">Sublingual</option>
+    </select>
+  </div>
+  <div class="form-group">
+    <label for="medName">Nome do medicamento:</label>
+    <input type="text" id="medName" placeholder="Nome do medicamento" />
+  </div>
 
-      <div id="prescriptionPanel" class="panel" style="display: none;">
-        <h1>Prescrição</h1>
-        <!-- Botão que chama clearPrescription() -->
-        <button onclick="clearPrescription()" style="margin-bottom: 10px;">🗑️ Limpar Prescrição</button>
-        <textarea id="prescriptionBox" placeholder="Escreva a prescrição aqui..."></textarea>
-      </div>
+  <div class="form-group">
+    <label for="medDose">Posologia:</label>
+    <input type="text" id="medDose" placeholder="Posologia" />
+  </div>
+
+  <div class="form-group">
+    <label for="medQuantidade">Quantidade:</label>
+    <input type="text" id="medQuantidade" placeholder="Quantidade (ex: 30 comp, 1 ampola)" />
+  </div>
+
+  <div class="buttons-row">
+    <button onclick="addMed()">Adicionar</button>
+    <button id="cancelEdit" onclick="clearForm()" style="display: none;">Cancelar</button>
+  </div>
+</div>
+    </div>
+    <div id="prescriptionPanel" class="panel" style="display: none;">
+      <h1>Prescrição</h1>
+      <!-- Botão que chama clearPrescription() -->
+      <button onclick="clearPrescription()" style="margin-bottom: 10px;">🗑️ Limpar Prescrição</button>
+      <textarea id="prescriptionBox" placeholder="Escreva a prescrição aqui..."></textarea>
     </div>
   </div>
   <script type="module" src="script.js"></script>

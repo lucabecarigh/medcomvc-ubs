@@ -18,6 +18,7 @@
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
     import { getAuth, createUserWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-auth.js";
+    import { getFirestore, setDoc, doc } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
 
     const firebaseConfig = {
       apiKey: "AIzaSyAmF5FS_ekWW_7-1RUHtGCR71LH6r9fg08",
@@ -31,6 +32,7 @@
 
     const app = initializeApp(firebaseConfig);
     const auth = getAuth(app);
+    const db = getFirestore(app);
 
     document.getElementById("btnCadastrar").addEventListener("click", async () => {
       const email = document.getElementById("email").value;
@@ -38,9 +40,27 @@
 
       try {
         const userCredential = await createUserWithEmailAndPassword(auth, email, senha);
-        const user = userCredential.user;
-        alert("Cadastro realizado com sucesso! UID: " + user.uid);
+        const uid = userCredential.user.uid;
+
+        // Criar documento na coleção "pacientes"
+        await setDoc(doc(db, "pacientes", uid), {
+          criadoEm: new Date().toISOString(),
+          calendario: [{}],
+          identificacao: [{email: email}],
+          meusmedicos: [{}],
+          resumo: [{}],
+          prontuario: [{}],
+          tratamento: [{}],
+          exame: [{}],
+          documento: [{}]
+        });
+
+  
+        
+
+        alert("Usuário cadastrado com sucesso!");
         window.location.href = "index.html";
+
       } catch (error) {
         console.error("Erro ao cadastrar:", error);
         alert("Erro: " + error.message);
@@ -49,4 +69,3 @@
   </script>
 </body>
 </html>
-
