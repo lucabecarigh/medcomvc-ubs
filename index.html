@@ -16,7 +16,6 @@
     <button onclick="window.location.assign('cadastro.html')" class="btn-login">Criar novo usuário</button>
   </div>
 
-  <!-- Firebase SDKs -->
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
     import { getFirestore, doc, getDoc } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
@@ -43,20 +42,26 @@
       try {
         const userCredential = await signInWithEmailAndPassword(auth, email, senha);
         const uid = userCredential.user.uid;
+        console.log("Usuário autenticado. UID:", uid);
 
+        // Salva o UID no localStorage (se quiser usar depois em outras páginas)
+        localStorage.setItem("uid", uid);
+
+        // Verifica se é médico
         const docMedico = await getDoc(doc(db, "medicos", uid));
         if (docMedico.exists()) {
           window.location.href = "medico.html";
           return;
         }
 
+        // Verifica se é paciente
         const docPaciente = await getDoc(doc(db, "pacientes", uid));
         if (docPaciente.exists()) {
           window.location.href = "paciente.html";
           return;
         }
 
-        alert("Usuário não está cadastrado como médico nem como paciente.");
+        alert("Usuário autenticado, mas não está na coleção de médicos nem de pacientes.");
       } catch (error) {
         console.error("Erro ao fazer login:", error);
         alert("Email ou senha incorretos.");
