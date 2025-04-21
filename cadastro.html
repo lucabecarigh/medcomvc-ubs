@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Cadastro de Novo Usuário</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <h1>Cadastrar Novo Paciente</h1>
+
+  <div class="login-container">
+    <input type="email" id="email" placeholder="Digite seu e-mail" />
+    <input type="password" id="senha" placeholder="Digite uma senha" />
+    <button onclick="cadastrarUsuario()">Cadastrar</button>
+  </div>
+
+  <!-- Firebase SDKs -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
+    import { getAuth, createUserWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-auth.js";
+
+    // Firebase config
+    const firebaseConfig = {
+      apiKey: "AIzaSyAmF5FS_ekWW_7-1RUHtGCR71LH6r9fg08",
+      authDomain: "medcomvc-ubs.firebaseapp.com",
+      projectId: "medcomvc-ubs",
+      storageBucket: "medcomvc-ubs.appspot.com",
+      messagingSenderId: "313420248004",
+      appId: "1:313420248004:web:a9a28d97b3ef2e33c36a91",
+      measurementId: "G-04YK0WXT42"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+
+    async function cadastrarUsuario() {
+      const email = document.getElementById("email").value;
+      const senha = document.getElementById("senha").value;
+
+      try {
+        const userCredential = await createUserWithEmailAndPassword(auth, email, senha);
+        const user = userCredential.user;
+        alert("Cadastro realizado com sucesso! UID: " + user.uid);
+        // você pode redirecionar ou salvar mais dados se quiser
+        window.location.href = "index.html";
+      } catch (error) {
+        console.error("Erro ao cadastrar:", error);
+        alert("Erro: " + error.message);
+      }
+    }
+  </script>
+</body>
+</html>
