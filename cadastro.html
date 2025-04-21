@@ -55,13 +55,8 @@
           documento: [{}]
         });
 
-        // Criar documento na coleção "medicos" com arrays vazias
-        await setDoc(doc(db, "medicos", uid), {
-          calendario: [],
-          financeiro: [],
-          identificacao: [],
-          meuspacientes: []
-        });
+  
+        
 
         alert("Usuário cadastrado com sucesso!");
         window.location.href = "index.html";

@@ -27,7 +27,7 @@
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
     import { getFirestore, doc, getDoc } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
     import { getAuth, signInWithEmailAndPassword, sendPasswordResetEmail } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-auth.js";
-
+  
     const firebaseConfig = {
       apiKey: "AIzaSyAmF5FS_ekWW_7-1RUHtGCR71LH6r9fg08",
       authDomain: "medcomvc-ubs.firebaseapp.com",
@@ -37,29 +37,29 @@
       appId: "1:313420248004:web:a9a28d97b3ef2e33c36a91",
       measurementId: "G-04YK0WXT42"
     };
-
+  
     const app = initializeApp(firebaseConfig);
     const db = getFirestore(app);
     const auth = getAuth(app);
-
+  
     async function fazerLogin() {
       const email = document.getElementById("email").value;
       const senha = document.getElementById("senha").value;
       const tipo = document.getElementById("tipo-usuario").value;
-
+  
       if (!email || !senha) {
         alert("Preencha o e-mail e a senha.");
         return;
       }
-
+  
       try {
         const userCredential = await signInWithEmailAndPassword(auth, email, senha);
         const uid = userCredential.user.uid;
-
+  
         localStorage.setItem("uid", uid);
-
+  
         const docRef = await getDoc(doc(db, tipo, uid));
-
+  
         if (docRef.exists()) {
           if (tipo === "medicos") {
             window.location.href = "medico.html";
@@ -69,21 +69,21 @@
         } else {
           alert("Usuário não está registrado como " + (tipo === "medicos" ? "médico" : "paciente") + ".");
         }
-
+  
       } catch (error) {
         console.error("Erro no login:", error);
         alert("Email ou senha incorretos.");
       }
     }
-
+  
     async function esqueciSenha() {
       const email = document.getElementById("email").value;
-
+  
       if (!email) {
         alert("Por favor, preencha o campo de e-mail.");
         return;
       }
-
+  
       try {
         await sendPasswordResetEmail(auth, email);
         alert("E-mail de redefinição de senha enviado com sucesso!");
@@ -92,6 +92,10 @@
         alert("Erro: " + error.message);
       }
     }
+  
+    // 📣 Aqui está a linha que torna suas funções visíveis no HTML:
+    window.fazerLogin = fazerLogin;
+    window.esqueciSenha = esqueciSenha;
   </script>
 </body>
 </html>
