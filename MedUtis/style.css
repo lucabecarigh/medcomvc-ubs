@@ -113,7 +113,7 @@ body {
   display: block;      /* force each onto its own line */
   width: 100%;         /* fill available width */
   margin-bottom: 15px; /* spacing between fields */
-  padding: 10px;
+  padding: 10px; 
   box-sizing: border-box;
 }
 
@@ -135,9 +135,20 @@ body {
   background-color: #bfdbfe;
 }
 
+/* Empilha os campos do formulário um embaixo do outro */
 .inline-row {
-  display: flex;         /* places children in a row */
-  flex-wrap: column;     /* prevents wrapping onto new lines */
-  gap: 10px;             /* space between items */
-  align-items: center;   /* vertically center them */
+  display: flex;           /* mantém flexbox */
+  flex-direction: column;  /* empilha os filhos */
+  gap: 10px;               /* espaço entre eles */
+  align-items: stretch;    /* campos ocupam 100% da largura */
+}
+
+/* Caixa de texto da prescrição */
+#prescriptionBox {
+  width: 100%;      /* ocupa toda a largura do painel */
+  height: 40vh;     /* altura relativa à viewport */
+  padding: 10px;
+  box-sizing: border-box;
+  resize: vertical; /* usuário pode aumentar/diminuir a altura */
+  font-family: inherit; /* mantém a mesma fonte do app */
 }
