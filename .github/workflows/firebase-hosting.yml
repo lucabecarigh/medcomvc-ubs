@@ -1,0 +1,29 @@
+name: Deploy para Firebase Hosting
+
+on:
+  push:
+    branches:
+      - main  # ou "master", depende da sua branch principal
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Clonar repositório
+        uses: actions/checkout@v3
+
+      - name: Configurar Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+
+      - name: Instalar Firebase CLI
+        run: npm install -g firebase-tools
+
+      - name: Deploy no Firebase Hosting
+        env:
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+        run: |
+          echo "$FIREBASE_SERVICE_ACCOUNT" > serviceAccount.json
+          firebase deploy --only hosting --project medcomvc-ubs --token "$(cat serviceAccount.json | jq -r .private_key)"
