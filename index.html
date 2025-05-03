@@ -6,7 +6,6 @@
   <title>Login - Prontuário</title>
   <link rel="stylesheet" href="style.css" />
   <style>
-    /* Modal estilo leve para o app */
     #medutisModal {
       display: none;
       position: fixed;
@@ -60,16 +59,13 @@
     <button onclick="fazerLogin()" class="btn-login">Entrar</button>
     <button onclick="window.location.assign('cadastro.html')" class="btn-login">Criar novo usuário</button>
     <button onclick="esqueciSenha()" class="btn-consultas">Esqueci minha senha</button>
-
-    <!-- Botão para abrir o app MedUtis -->
     <button onclick="abrirMedutis()" class="btn-consultas">💊 med.fácil</button>
   </div>
 
-  <!-- Modal do MedUtis -->
   <div id="medutisModal">
     <div id="medutisModalContent">
       <span id="medutisModalClose" onclick="fecharMedutis()">✕</span>
-      <iframe src="MedUtis/index.html"></iframe>
+      <iframe id="iframeMedutis"></iframe>
     </div>
   </div>
 
@@ -108,15 +104,11 @@
         localStorage.setItem("uid", uid);
 
         const docRef = await getDoc(doc(db, tipo, uid));
-
         if (docRef.exists()) {
-          if (tipo === "medicos") {
-            window.location.href = "medico.html";
-          } else {
-            window.location.href = "paciente.html";
-          }
+          const destino = tipo === "medicos" ? "medico.html" : "paciente.html";
+          window.location.href = destino;
         } else {
-          alert("Usuário não está registrado como " + (tipo === "medicos" ? "médico" : "paciente") + ".");
+          alert("Usuário não registrado como " + tipo + ".");
         }
 
       } catch (error) {
@@ -127,31 +119,29 @@
 
     async function esqueciSenha() {
       const email = document.getElementById("email").value;
-      if (!email) {
-        alert("Por favor, preencha o campo de e-mail.");
-        return;
-      }
-
+      if (!email) return alert("Preencha o campo de e-mail.");
       try {
         await sendPasswordResetEmail(auth, email);
-        alert("E-mail de redefinição de senha enviado com sucesso!");
+        alert("E-mail enviado com sucesso.");
       } catch (error) {
-        console.error("Erro ao enviar redefinição de senha:", error);
+        console.error("Erro ao redefinir senha:", error);
         alert("Erro: " + error.message);
       }
     }
 
-    window.fazerLogin = fazerLogin;
-    window.esqueciSenha = esqueciSenha;
-
-    // 🧪 Funções do MedUtis
+    // Abrir/fechar o modal do MedUtis com iframe carregado dinamicamente
     window.abrirMedutis = () => {
+      document.getElementById("iframeMedutis").src = "MedUtis/index.html";
       document.getElementById("medutisModal").style.display = "flex";
     };
 
     window.fecharMedutis = () => {
       document.getElementById("medutisModal").style.display = "none";
+      document.getElementById("iframeMedutis").src = ""; // limpa
     };
+
+    window.fazerLogin = fazerLogin;
+    window.esqueciSenha = esqueciSenha;
   </script>
 </body>
 </html>

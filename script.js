@@ -118,3 +118,13 @@ window.fecharModalNovoPaciente = fecharModalNovoPaciente;
 window.salvarNovoPaciente = salvarNovoPaciente;
 window.abrirPasta = abrirPasta;
 window.verConsultas = verConsultas;
+window.abrirMedutis = () => {
+  const iframe = document.getElementById("iframeMedutis");
+  iframe.src = "MedUtis/index.html"; // SÓ carrega agora
+  document.getElementById("medutisModal").style.display = "flex";
+};
+
+window.fecharMedutis = () => {
+  document.getElementById("iframeMedutis").src = ""; // DESCONECTA o conteúdo
+  document.getElementById("medutisModal").style.display = "none";
+};
