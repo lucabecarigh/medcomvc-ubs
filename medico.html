@@ -48,59 +48,65 @@
     const db = getFirestore(app);
 
     async function listarPacientes() {
-      const container = document.getElementById('lista-pacientes');
-      container.innerHTML = "<p>Carregando pacientes...</p>";
+  const container = document.getElementById('lista-pacientes');
+  container.innerHTML = "<p>Carregando pacientes...</p>";
 
-      const uidMedico = localStorage.getItem("uid");
-      if (!uidMedico) {
-        container.innerHTML = "<p>Erro: médico não identificado.</p>";
-        return;
-      }
+  const uidMedico = localStorage.getItem("uid");
+  console.log("UID do médico:", uidMedico);
+  if (!uidMedico) {
+    container.innerHTML = "<p>Erro: médico não identificado.</p>";
+    return;
+  }
 
-      try {
-        const medicoRef = doc(db, "medicos", uidMedico);
-        const medicoSnap = await getDoc(medicoRef);
+  try {
+    const medicoRef = doc(db, "medicos", uidMedico);
+    const medicoSnap = await getDoc(medicoRef);
+    console.log("Dados do médico:", medicoSnap.exists(), medicoSnap.data());
 
-        if (!medicoSnap.exists()) {
-          container.innerHTML = "<p>Médico não encontrado no Firestore.</p>";
-          return;
-        }
+    if (!medicoSnap.exists()) {
+      container.innerHTML = "<p>Médico não encontrado no Firestore.</p>";
+      return;
+    }
 
-        const dadosMedico = medicoSnap.data();
-        const meuspacientes = dadosMedico.meuspacientes || [];
+    const dadosMedico = medicoSnap.data();
+    const meuspacientes = dadosMedico.meuspacientes || [];
+    console.log("IDs dos pacientes vinculados:", meuspacientes);
 
-        if (meuspacientes.length === 0) {
-          container.innerHTML = "<p>Você ainda não tem pacientes vinculados.</p>";
-          return;
-        }
+    if (meuspacientes.length === 0) {
+      container.innerHTML = "<p>Você ainda não tem pacientes vinculados.</p>";
+      return;
+    }
 
-        container.innerHTML = "";
+    container.innerHTML = "";
 
-        for (const uidPaciente of meuspacientes) {
-          const pacienteRef = doc(db, "pacientes", uidPaciente);
-          const pacienteSnap = await getDoc(pacienteRef);
+    for (const uidPaciente of meuspacientes) {
+      const pacienteRef = doc(db, "pacientes", uidPaciente);
+      const pacienteSnap = await getDoc(pacienteRef);
+      console.log(`Dados do paciente (${uidPaciente}):`, pacienteSnap.exists(), pacienteSnap.data());
 
-          if (pacienteSnap.exists()) {
-            const dadosPaciente = pacienteSnap.data();
-            const identificacao = dadosPaciente.identificacao?.[0] || {};
-            const nome = identificacao.nome || "Paciente";
-            const sobrenome = identificacao.sobrenome || "";
+      if (pacienteSnap.exists()) {
+        const dadosPaciente = pacienteSnap.data();
+        const identificacao = dadosPaciente.identificacao?.[0] || {};
+        const nome = identificacao.nome || "Paciente";
+        const sobrenome = identificacao.sobrenome || "";
 
-            const div = document.createElement("div");
-            div.classList.add("pasta");
-            div.innerText = `${nome} ${sobrenome}`;
-            div.onclick = () => {
-              localStorage.setItem("pacienteSelecionado", uidPaciente);
-              window.location.href = "paciente_view.html";
-            };
-            container.appendChild(div);
-          }
-        }
-      } catch (error) {
-        console.error("Erro ao carregar pacientes:", error);
-        container.innerHTML = "<p>Erro ao carregar pacientes.</p>";
+        const div = document.createElement("div");
+        div.classList.add("pasta");
+        div.innerText = `${nome} ${sobrenome}`;
+        div.onclick = () => {
+          localStorage.setItem("pacienteSelecionado", uidPaciente);
+          window.location.href = "paciente_view.html";
+        };
+        container.appendChild(div);
+      } else {
+        console.warn(`Paciente com UID ${uidPaciente} não encontrado no Firestore.`);
       }
     }
+  } catch (error) {
+    console.error("Erro ao carregar pacientes:", error);
+    container.innerHTML = "<p>Erro ao carregar pacientes.</p>";
+  }
+}
 
     function abrirCalendario() {
       alert("Exibir calendário com todas as consultas.");
