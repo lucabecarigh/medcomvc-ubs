@@ -62,11 +62,10 @@
     <button onclick="abrirMedutis()" class="btn-consultas">💊 med.fácil</button>
   </div>
 
-  <!-- Modal do MedUtis -->
   <div id="medutisModal">
     <div id="medutisModalContent">
       <span id="medutisModalClose" onclick="fecharMedutis()">✕</span>
-      <iframe id="iframeMedutis" src=""></iframe>
+      <iframe id="iframeMedutis"></iframe>
     </div>
   </div>
 
@@ -74,7 +73,6 @@
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
     import { getFirestore, doc, getDoc } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
     import { getAuth, signInWithEmailAndPassword, sendPasswordResetEmail } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-auth.js";
-    import { autenticarAnonimamente } from "./MedUtis/script.js";
 
     const firebaseConfig = {
       apiKey: "AIzaSyAmF5FS_ekWW_7-1RUHtGCR71LH6r9fg08",
@@ -106,15 +104,11 @@
         localStorage.setItem("uid", uid);
 
         const docRef = await getDoc(doc(db, tipo, uid));
-
         if (docRef.exists()) {
-          if (tipo === "medicos") {
-            window.location.href = `medico.html?uid=${uid}`;
-          } else {
-            window.location.href = `paciente.html?uid=${uid}`;
-          }
+          const destino = tipo === "medicos" ? "medico.html" : "paciente.html";
+          window.location.href = destino;
         } else {
-          alert("Usuário não está registrado como " + (tipo === "medicos" ? "médico" : "paciente") + ".");
+          alert("Usuário não registrado como " + tipo + ".");
         }
 
       } catch (error) {
@@ -125,40 +119,29 @@
 
     async function esqueciSenha() {
       const email = document.getElementById("email").value;
-      if (!email) {
-        alert("Por favor, preencha o campo de e-mail.");
-        return;
-      }
-
+      if (!email) return alert("Preencha o campo de e-mail.");
       try {
         await sendPasswordResetEmail(auth, email);
-        alert("E-mail de redefinição de senha enviado com sucesso!");
+        alert("E-mail enviado com sucesso.");
       } catch (error) {
-        console.error("Erro ao enviar redefinição de senha:", error);
+        console.error("Erro ao redefinir senha:", error);
         alert("Erro: " + error.message);
       }
     }
 
-    async function abrirMedutis() {
-      try {
-        await autenticarAnonimamente(); // só agora faz login anônimo
-        document.getElementById("iframeMedutis").src = "MedUtis/index.html";
-        document.getElementById("medutisModal").style.display = "flex";
-      } catch (e) {
-        alert("Erro ao abrir MedUtis.");
-        console.error("Erro ao abrir MedUtis:", e);
-      }
-    }
+    // Abrir/fechar o modal do MedUtis com iframe carregado dinamicamente
+    window.abrirMedutis = () => {
+      document.getElementById("iframeMedutis").src = "MedUtis/index.html";
+      document.getElementById("medutisModal").style.display = "flex";
+    };
 
-    function fecharMedutis() {
-      document.getElementById("iframeMedutis").src = "";
+    window.fecharMedutis = () => {
       document.getElementById("medutisModal").style.display = "none";
-    }
+      document.getElementById("iframeMedutis").src = ""; // limpa
+    };
 
     window.fazerLogin = fazerLogin;
     window.esqueciSenha = esqueciSenha;
-    window.abrirMedutis = abrirMedutis;
-    window.fecharMedutis = fecharMedutis;
   </script>
 </body>
 </html>

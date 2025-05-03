@@ -1,157 +1,69 @@
 <!DOCTYPE html>
-<html lang="pt-BR">
+<html lang="pt-br">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Login - Prontuário</title>
+  <title>Biblioteca de Posologias</title>
   <link rel="stylesheet" href="style.css" />
-  <style>
-    #medutisModal {
-      display: none;
-      position: fixed;
-      z-index: 9999;
-      left: 0; top: 0;
-      width: 100%; height: 100%;
-      background-color: rgba(0, 0, 0, 0.6);
-      justify-content: center;
-      align-items: center;
-    }
-
-    #medutisModalContent {
-      background: #fff;
-      width: 95%;
-      height: 90%;
-      border-radius: 10px;
-      overflow: hidden;
-      position: relative;
-    }
-
-    #medutisModalContent iframe {
-      width: 100%;
-      height: 100%;
-      border: none;
-    }
-
-    #medutisModalClose {
-      position: absolute;
-      top: 10px;
-      right: 15px;
-      font-size: 20px;
-      font-weight: bold;
-      color: #444;
-      cursor: pointer;
-      z-index: 10000;
-    }
-  </style>
 </head>
 <body>
-  <h1>Login no Prontuário Online</h1>
+  <div class="app">
+    <div class="sidebar">
+      <h2>Posologias</h2>
+      <div class="tools">
+        <button onclick="showPanel('add')">➕ Adicionar Posologia</button>
+        <button onclick="showPanel('prescription')">📝 Prescrição</button>
+      </div>
+      <input type="text" id="search" placeholder="Buscar..." />
+      <ul id="medList"></ul>
+    </div>
 
-  <div class="login-container">
-    <select id="tipo-usuario">
-      <option value="pacientes">Sou Paciente</option>
-      <option value="medicos">Sou Médico</option>
-    </select>
+    <div class="main">
+      <div id="addPanel" class="panel form-container">
+        <h1>Adicionar nova posologia</h1>
+        <div class="inline-row">
+          <div class="form-group">
+            <label for="medVia">Via de administração:</label>
+            <select id="medVia">
+              <option value="oral">Oral</option>
+              <option value="ev">Endovenosa (EV)</option>
+              <option value="im">Intramuscular (IM)</option>
+              <option value="sc">Subcutânea (SC)</option>
+              <option value="inalatoria">Inalatória</option>
+              <option value="topica">Tópica</option>
+              <option value="retal">Retal</option>
+              <option value="nasal">Nasal</option>
+              <option value="sublingual">Sublingual</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="medName">Nome do medicamento:</label>
+            <input type="text" id="medName" placeholder="Nome do medicamento" />
+          </div>
+          <div class="form-group">
+            <label for="medDose">Posologia:</label>
+            <input type="text" id="medDose" placeholder="Posologia" />
+          </div>
+          <div class="form-group">
+            <label for="medQuantidade">Quantidade:</label>
+            <input type="text" id="medQuantidade" placeholder="Quantidade (ex: 30 comp, 1 ampola)" />
+          </div>
+          <div class="buttons-row">
+            <button onclick="addMed()">Adicionar</button>
+            <button id="cancelEdit" onclick="clearForm()" style="display: none;">Cancelar</button>
+          </div>
+        </div>
+      </div>
 
-    <input type="email" id="email" placeholder="Digite seu e-mail" />
-    <input type="password" id="senha" placeholder="Digite sua senha" />
-
-    <button onclick="fazerLogin()" class="btn-login">Entrar</button>
-    <button onclick="window.location.assign('cadastro.html')" class="btn-login">Criar novo usuário</button>
-    <button onclick="esqueciSenha()" class="btn-consultas">Esqueci minha senha</button>
-    <button onclick="abrirMedutis()" class="btn-consultas">💊 med.fácil</button>
-  </div>
-
-  <div id="medutisModal">
-    <div id="medutisModalContent">
-      <span id="medutisModalClose" onclick="fecharMedutis()">✕</span>
-      <iframe id="iframeMedutis" src=""></iframe>
+      <div id="prescriptionPanel" class="panel" style="display: none;">
+        <h1>Prescrição</h1>
+        <button onclick="clearPrescription()" style="margin-bottom: 10px;">🗑️ Limpar Prescrição</button>
+        <textarea id="prescriptionBox" placeholder="Escreva a prescrição aqui..."></textarea>
+      </div>
     </div>
   </div>
 
-  <script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
-    import { getFirestore, doc, getDoc } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
-    import { getAuth, signInWithEmailAndPassword, sendPasswordResetEmail } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-auth.js";
-
-    const firebaseConfig = {
-      apiKey: "AIzaSyAmF5FS_ekWW_7-1RUHtGCR71LH6r9fg08",
-      authDomain: "medcomvc-ubs.firebaseapp.com",
-      projectId: "medcomvc-ubs",
-      storageBucket: "medcomvc-ubs.appspot.com",
-      messagingSenderId: "313420248004",
-      appId: "1:313420248004:web:a9a28d97b3ef2e33c36a91",
-      measurementId: "G-04YK0WXT42"
-    };
-
-    const app = initializeApp(firebaseConfig);
-    const db = getFirestore(app);
-    const auth = getAuth(app);
-
-    async function fazerLogin() {
-      const email = document.getElementById("email").value;
-      const senha = document.getElementById("senha").value;
-      const tipo = document.getElementById("tipo-usuario").value;
-
-      if (!email || !senha) {
-        alert("Preencha o e-mail e a senha.");
-        return;
-      }
-
-      try {
-        const userCredential = await signInWithEmailAndPassword(auth, email, senha);
-        const uid = userCredential.user.uid;
-        localStorage.setItem("uid", uid);
-
-        const docRef = await getDoc(doc(db, tipo, uid));
-
-        if (docRef.exists()) {
-          if (tipo === "medicos") {
-            window.location.href = `medico.html?uid=${uid}`;
-          } else {
-            window.location.href = `paciente.html?uid=${uid}`;
-          }
-        } else {
-          alert("Usuário não está registrado como " + (tipo === "medicos" ? "médico" : "paciente") + ".");
-        }
-
-      } catch (error) {
-        console.error("Erro no login:", error);
-        alert("Email ou senha incorretos.");
-      }
-    }
-
-    async function esqueciSenha() {
-      const email = document.getElementById("email").value;
-      if (!email) {
-        alert("Por favor, preencha o campo de e-mail.");
-        return;
-      }
-
-      try {
-        await sendPasswordResetEmail(auth, email);
-        alert("E-mail de redefinição de senha enviado com sucesso!");
-      } catch (error) {
-        console.error("Erro ao enviar redefinição de senha:", error);
-        alert("Erro: " + error.message);
-      }
-    }
-
-    function abrirMedutis() {
-      const iframe = document.getElementById("iframeMedutis");
-      iframe.src = "MedUtis/index.html"; // só carrega ao clicar
-      document.getElementById("medutisModal").style.display = "flex";
-    }
-
-    function fecharMedutis() {
-      document.getElementById("medutisModal").style.display = "none";
-      document.getElementById("iframeMedutis").src = ""; // remove conteúdo
-    }
-
-    window.fazerLogin = fazerLogin;
-    window.esqueciSenha = esqueciSenha;
-    window.abrirMedutis = abrirMedutis;
-    window.fecharMedutis = fecharMedutis;
-  </script>
+  <!-- Script do miniapp -->
+  <script type="module" src="script.js"></script>
 </body>
 </html>

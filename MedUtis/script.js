@@ -3,7 +3,6 @@ import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/1
 import { getFirestore, collection, addDoc, getDocs, doc, updateDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/11.6.0/firebase-firestore.js";
 
 // 1) CONFIGURAÇÃO DO SEU PROJETO FIREBASE
-// Substitua pelos valores do seu projeto:
 const firebaseConfig = {
   apiKey: "AIzaSyAmF5FS_ekWW_7-1RUHtGCR71LH6r9fg08",
   authDomain: "medcomvc-ubs.firebaseapp.com",
@@ -14,18 +13,18 @@ const firebaseConfig = {
   measurementId: "G-GCDLLVE7SX"
 };
 
-// 2) INICIALIZA O FIREBASE E O FIRESTORE
+// 2) INICIALIZA O FIREBASE
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
-
-// 3) FAZ SIGN-IN ANÔNIMOO
-// 3) FAZ SIGN-IN ANÔNIMO apenas quando chamado
 const auth = getAuth(app);
 
-export async function autenticarAnonimamente() {
+// 3) FUNÇÃO PARA FAZER LOGIN ANÔNIMO
+async function autenticarAnonimamente() {
   try {
     await signInAnonymously(auth);
     console.log("✅ Sign-in anônimo bem-sucedido (MedUtis)");
+    await loadMedsFromFirestore();
+    renderList();
   } catch (error) {
     console.error("❌ Erro ao fazer sign-in anônimo:", error);
   }
@@ -34,22 +33,13 @@ export async function autenticarAnonimamente() {
 // ====================================================================
 // LÓGICA DO SEU APLICATIVO
 // ====================================================================
-
-// Array local para exibir no sidebar
 let meds = [];
-// Índice e ID de documento para edição
 let editingIndex = null;
 let editingDocId = null;
-
-// Prescrição
 let prescricaoLista = [];
 
-/**
- * Carrega as posologias do Firestore e atualiza a lista local (meds).
- */
 async function loadMedsFromFirestore() {
   meds = [];
-  // Busca a coleção "posologias"
   const querySnapshot = await getDocs(collection(db, "posologias"));
   querySnapshot.forEach((docSnap) => {
     const data = docSnap.data();
@@ -63,14 +53,9 @@ async function loadMedsFromFirestore() {
   });
 }
 
-/**
- * Redesenha a lista no sidebar, usando o array "meds".
- */
 function renderList() {
   const list = document.getElementById("medList");
   const search = document.getElementById("search")?.value.toLowerCase() || "";
-
-  // Filtra e ordena
   const filtered = meds
     .filter(med => med.nome.toLowerCase().includes(search))
     .sort((a, b) => a.nome.localeCompare(b.nome));
@@ -79,7 +64,6 @@ function renderList() {
 
   filtered.forEach((med) => {
     const idxReal = meds.findIndex(m => m.id === med.id);
-
     const item = document.createElement("li");
 
     const textSpan = document.createElement("span");
@@ -133,25 +117,18 @@ function renderList() {
   });
 }
 
-/**
- * Adiciona (ou atualiza) a posologia no Firestore.
- */
 async function addMed() {
   const nome = document.getElementById("medName").value.trim();
   const dose = document.getElementById("medDose").value.trim();
   const via = document.getElementById("medVia").value || "oral";
   const quantidade = document.getElementById("medQuantidade").value.trim() || "30 comp";
-
   if (!nome || !dose) return;
 
   const novoMed = { nome, dose, via, quantidade };
-
   try {
     if (editingIndex !== null && editingDocId) {
-      // Atualiza no Firestore
       await updateDoc(doc(db, "posologias", editingDocId), novoMed);
     } else {
-      // Cria novo documento
       await addDoc(collection(db, "posologias"), novoMed);
     }
   } catch (error) {
@@ -163,9 +140,6 @@ async function addMed() {
   renderList();
 }
 
-/**
- * Limpa o formulário e cancela o modo de edição.
- */
 function clearForm() {
   document.getElementById("medName").value = "";
   document.getElementById("medDose").value = "";
@@ -176,9 +150,6 @@ function clearForm() {
   showCancelButton(false);
 }
 
-/**
- * Editar item
- */
 function editMed(index) {
   const med = meds[index];
   showPanel("add");
@@ -193,9 +164,6 @@ function editMed(index) {
   showCancelButton(true);
 }
 
-/**
- * Excluir item
- */
 async function deleteMed(index) {
   if (!confirm("Tem certeza que deseja excluir esta posologia?")) return;
 
@@ -212,25 +180,16 @@ async function deleteMed(index) {
   renderList();
 }
 
-/**
- * Mostra ou esconde o botão "Cancelar"
- */
 function showCancelButton(show) {
   const btn = document.getElementById("cancelEdit");
   btn.style.display = show ? "inline-block" : "none";
 }
 
-/**
- * Mostra ou oculta o painel "Adicionar" ou "Prescrição"
- */
 function showPanel(panel) {
   document.getElementById("addPanel").style.display = panel === "add" ? "block" : "none";
   document.getElementById("prescriptionPanel").style.display = panel === "prescription" ? "block" : "none";
 }
 
-/**
- * Limpa todo o texto de prescrição
- */
 function clearPrescription() {
   if (confirm("Deseja limpar toda a prescrição?")) {
     document.getElementById("prescriptionBox").value = "";
@@ -238,25 +197,16 @@ function clearPrescription() {
   }
 }
 
-/**
- * Listener para a busca
- */
 document.getElementById("search")?.addEventListener("input", () => {
   renderList();
 });
 
-/**
- * Ao carregar a página, faz a leitura inicial
- */
-window.onload = async () => {
-  // Carrega todos os docs do Firestore e exibe
-  await loadMedsFromFirestore();
-  renderList();
+// ⏳ FAZ LOGIN ANÔNIMO APENAS APÓS O CARREGAMENTO
+window.onload = () => {
+  autenticarAnonimamente();
 };
 
-// ====================================================================
-// 4) EXPONDO FUNÇÕES NO ESCOPO GLOBAL, para chamadas no HTML
-// ====================================================================
+// Exportando para HTML
 window.addMed = addMed;
 window.clearForm = clearForm;
 window.editMed = editMed;

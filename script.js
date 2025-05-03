@@ -3,13 +3,11 @@ console.log("✅ script.js carregado!");
 import {
   doc,
   setDoc,
-  getDoc
+  getDoc,
+  collection
 } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
 
-import { getAuth } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-auth.js";
 import { db } from "./firebase-config.js";
-
-const auth = getAuth();
 
 function abrirModalNovoPaciente() {
   document.getElementById("modalNovoPaciente").style.display = "flex";
@@ -25,14 +23,7 @@ async function salvarNovoPaciente() {
   const idade = parseInt(document.getElementById("novo-idade").value);
   const cidade = document.getElementById("novo-cidade").value.trim();
   const estado = document.getElementById("novo-estado").value.trim();
-
-  const user = auth.currentUser;
-  if (!user) {
-    alert("Você não está autenticado.");
-    return;
-  }
-
-  const medicoId = user.uid;
+  const medicoId = localStorage.getItem("uid");
 
   if (!nome || !sobrenome || !idade || !cidade || !estado) {
     alert("Preencha todos os campos.");
@@ -40,7 +31,7 @@ async function salvarNovoPaciente() {
   }
 
   try {
-    const uidPaciente = crypto.randomUUID();
+    const uidPaciente = crypto.randomUUID(); // gerar UID aleatório, ou use do Firebase Auth se quiser
 
     // Criar documento do paciente
     await setDoc(doc(db, "pacientes", uidPaciente), {
@@ -61,7 +52,7 @@ async function salvarNovoPaciente() {
       tratamento: [{}]
     });
 
-    // Atualizar documento do médico para adicionar o novo paciente
+    // Atualizar documento do médico para adicionar esse paciente na lista
     const refMedico = doc(db, "medicos", medicoId);
     const docMedico = await getDoc(refMedico);
     const dados = docMedico.data();
@@ -72,17 +63,18 @@ async function salvarNovoPaciente() {
     alert("Paciente adicionado com sucesso!");
     fecharModalNovoPaciente();
 
-    // Recarregar lista se função existir
+    // Recarregar a lista de pacientes
     if (typeof listarPacientes === "function") {
-      listarPacientes(medicoId);
+      listarPacientes();
     }
 
   } catch (error) {
-    console.error("❌ Erro ao salvar novo paciente:", error);
+    console.error("Erro ao salvar novo paciente:", error);
     alert("Erro ao salvar novo paciente.");
   }
 }
 
+// função para abrir pastas do paciente
 async function abrirPasta(nome) {
   const pacienteId = localStorage.getItem("pacienteSelecionado");
   if (!pacienteId) {
@@ -110,24 +102,29 @@ async function abrirPasta(nome) {
     }
 
   } catch (error) {
-    console.error("❌ Erro ao abrir pasta:", error);
+    console.error("Erro ao abrir pasta:", error);
     alert("Erro ao abrir pasta.");
   }
 }
 
+// função de atalho
 function verConsultas() {
   abrirPasta("calendario");
 }
 
-function sair() {
-  localStorage.removeItem("uid");
-  window.location.href = "index.html";
-}
-
-// Exportar para uso no HTML
+// exportar para usar no HTML se quiser
 window.abrirModalNovoPaciente = abrirModalNovoPaciente;
 window.fecharModalNovoPaciente = fecharModalNovoPaciente;
 window.salvarNovoPaciente = salvarNovoPaciente;
 window.abrirPasta = abrirPasta;
 window.verConsultas = verConsultas;
-window.sair = sair;
+window.abrirMedutis = () => {
+  const iframe = document.getElementById("iframeMedutis");
+  iframe.src = "MedUtis/index.html"; // SÓ carrega agora
+  document.getElementById("medutisModal").style.display = "flex";
+};
+
+window.fecharMedutis = () => {
+  document.getElementById("iframeMedutis").src = ""; // DESCONECTA o conteúdo
+  document.getElementById("medutisModal").style.display = "none";
+};
