@@ -26,6 +26,12 @@
       position: relative;
     }
 
+    #medutisModalContent iframe {
+      width: 100%;
+      height: 100%;
+      border: none;
+    }
+
     #medutisModalClose {
       position: absolute;
       top: 10px;
@@ -35,12 +41,6 @@
       color: #444;
       cursor: pointer;
       z-index: 10000;
-    }
-
-    #medutisIframe {
-      width: 100%;
-      height: 100%;
-      border: none;
     }
   </style>
 </head>
@@ -59,18 +59,19 @@
     <button onclick="fazerLogin()" class="btn-login">Entrar</button>
     <button onclick="window.location.assign('cadastro.html')" class="btn-login">Criar novo usuário</button>
     <button onclick="esqueciSenha()" class="btn-consultas">Esqueci minha senha</button>
-
     <button onclick="abrirMedutis()" class="btn-consultas">💊 med.fácil</button>
   </div>
 
-  <!-- Modal do MedUtis -->
+  <!-- Modal do MedUtis (carregará o miniapp com iframe) -->
   <div id="medutisModal">
     <div id="medutisModalContent">
       <span id="medutisModalClose" onclick="fecharMedutis()">✕</span>
-      <!-- iframe será criado dinamicamente -->
+      <!-- iframe carrega a versão isolada do miniapp -->
+      <iframe id="iframeMedutis" src=""></iframe>
     </div>
   </div>
 
+  <!-- Firebase principal do app -->
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
     import { getFirestore, doc, getDoc } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
@@ -106,12 +107,17 @@
         localStorage.setItem("uid", uid);
 
         const docRef = await getDoc(doc(db, tipo, uid));
+
         if (docRef.exists()) {
-          const destino = tipo === "medicos" ? "medico.html" : "paciente.html";
-          window.location.href = `${destino}?uid=${uid}`;
+          if (tipo === "medicos") {
+            window.location.href = `medico.html?uid=${uid}`;
+          } else {
+            window.location.href = `paciente.html?uid=${uid}`;
+          }
         } else {
           alert("Usuário não está registrado como " + (tipo === "medicos" ? "médico" : "paciente") + ".");
         }
+
       } catch (error) {
         console.error("Erro no login:", error);
         alert("Email ou senha incorretos.");
@@ -134,28 +140,22 @@
       }
     }
 
-    // Modal MedUtis: iframe carregado só ao clicar
-    window.abrirMedutis = () => {
-      const modal = document.getElementById("medutisModal");
-      const content = document.getElementById("medutisModalContent");
+    // Botão que abre o MedUtis com o iframe apontando só no clique
+    function abrirMedutis() {
+      const iframe = document.getElementById("iframeMedutis");
+      iframe.src = "MedUtis/index.html"; // carrega o miniapp
+      document.getElementById("medutisModal").style.display = "flex";
+    }
 
-      // Adiciona iframe apenas se ainda não foi adicionado
-      if (!document.getElementById("medutisIframe")) {
-        const iframe = document.createElement("iframe");
-        iframe.id = "medutisIframe";
-        iframe.src = "MedUtis/index.html";
-        content.appendChild(iframe);
-      }
-
-      modal.style.display = "flex";
-    };
-
-    window.fecharMedutis = () => {
+    function fecharMedutis() {
       document.getElementById("medutisModal").style.display = "none";
-    };
+      document.getElementById("iframeMedutis").src = ""; // limpa o conteúdo
+    }
 
     window.fazerLogin = fazerLogin;
     window.esqueciSenha = esqueciSenha;
+    window.abrirMedutis = abrirMedutis;
+    window.fecharMedutis = fecharMedutis;
   </script>
 </body>
 </html>
