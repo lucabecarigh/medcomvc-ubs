@@ -33,6 +33,7 @@
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
     import { getFirestore, doc, getDoc } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
+    import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-auth.js";
 
     const firebaseConfig = {
       apiKey: "AIzaSyAmF5FS_ekWW_7-1RUHtGCR71LH6r9fg08",
@@ -46,23 +47,29 @@
 
     const app = initializeApp(firebaseConfig);
     const db = getFirestore(app);
+    const auth = getAuth(app);
 
-    // Função robusta para pegar o UID do médico
-    function obterUidMedico() {
-      const urlParams = new URLSearchParams(window.location.search);
-      const uidFromUrl = urlParams.get("uid");
-      if (uidFromUrl) {
-        localStorage.setItem("uid", uidFromUrl);
-        return uidFromUrl;
-      }
-      return localStorage.getItem("uid");
+    function abrirCalendario() {
+      alert("🔔 Ver todas as consultas");
     }
 
-    async function listarPacientes() {
+    function abrirModalNovoPaciente() {
+      document.getElementById("modalNovoPaciente").style.display = "flex";
+    }
+
+    function fecharModalNovoPaciente() {
+      document.getElementById("modalNovoPaciente").style.display = "none";
+    }
+
+    function sair() {
+      localStorage.removeItem("uid");
+      window.location.href = "index.html";
+    }
+
+    async function listarPacientes(uidMedico) {
       const container = document.getElementById('lista-pacientes');
       container.innerHTML = "<p>Carregando pacientes...</p>";
 
-      const uidMedico = obterUidMedico();
       console.log("🔑 UID do médico:", uidMedico);
 
       if (!uidMedico) {
@@ -117,28 +124,27 @@
         }
       } catch (e) {
         console.error("❌ Erro ao buscar pacientes:", e);
-        container.innerHTML = "<p>Erro ao carregar pacientes. Verifique o console.</p>";
+        document.getElementById("lista-pacientes").innerHTML = "<p>Erro ao carregar pacientes. Verifique o console.</p>";
       }
     }
 
-    function abrirCalendario() {
-      alert("🔔 Ver todas as consultas");
-    }
+    // Verifica se o usuário está autenticado
+    onAuthStateChanged(auth, (user) => {
+      if (user) {
+        console.log("✅ Usuário autenticado:", user.uid);
+        localStorage.setItem("uid", user.uid);
+        listarPacientes(user.uid);
+      } else {
+        console.warn("❌ Usuário NÃO autenticado.");
+        document.getElementById("lista-pacientes").innerHTML = "<p>Você não está autenticado. Por favor, volte à tela de login.</p>";
+      }
+    });
 
-    function abrirModalNovoPaciente() {
-      document.getElementById("modalNovoPaciente").style.display = "flex";
-    }
-
-    function fecharModalNovoPaciente() {
-      document.getElementById("modalNovoPaciente").style.display = "none";
-    }
-
-    function sair() {
-      localStorage.removeItem("uid");
-      window.location.href = "index.html";
-    }
-
-    window.addEventListener("DOMContentLoaded", listarPacientes);
+    // Tornar funções visíveis globalmente
+    window.abrirModalNovoPaciente = abrirModalNovoPaciente;
+    window.fecharModalNovoPaciente = fecharModalNovoPaciente;
+    window.abrirCalendario = abrirCalendario;
+    window.sair = sair;
   </script>
 </body>
 </html>
