@@ -6,7 +6,6 @@
   <title>Login - Prontuário</title>
   <link rel="stylesheet" href="style.css" />
   <style>
-    /* Modal estilo leve para o app */
     #medutisModal {
       display: none;
       position: fixed;
@@ -27,12 +26,6 @@
       position: relative;
     }
 
-    #medutisModalContent iframe {
-      width: 100%;
-      height: 100%;
-      border: none;
-    }
-
     #medutisModalClose {
       position: absolute;
       top: 10px;
@@ -42,6 +35,12 @@
       color: #444;
       cursor: pointer;
       z-index: 10000;
+    }
+
+    #medutisIframe {
+      width: 100%;
+      height: 100%;
+      border: none;
     }
   </style>
 </head>
@@ -61,7 +60,6 @@
     <button onclick="window.location.assign('cadastro.html')" class="btn-login">Criar novo usuário</button>
     <button onclick="esqueciSenha()" class="btn-consultas">Esqueci minha senha</button>
 
-    <!-- Botão para abrir o app MedUtis -->
     <button onclick="abrirMedutis()" class="btn-consultas">💊 med.fácil</button>
   </div>
 
@@ -69,7 +67,7 @@
   <div id="medutisModal">
     <div id="medutisModalContent">
       <span id="medutisModalClose" onclick="fecharMedutis()">✕</span>
-      <iframe src="MedUtis/index.html"></iframe>
+      <!-- iframe será criado dinamicamente -->
     </div>
   </div>
 
@@ -108,17 +106,12 @@
         localStorage.setItem("uid", uid);
 
         const docRef = await getDoc(doc(db, tipo, uid));
-
         if (docRef.exists()) {
-          if (tipo === "medicos") {
-            window.location.href = `medico.html?uid=${uid}`;
-          } else {
-            window.location.href = `paciente.html?uid=${uid}`;
-          }
+          const destino = tipo === "medicos" ? "medico.html" : "paciente.html";
+          window.location.href = `${destino}?uid=${uid}`;
         } else {
           alert("Usuário não está registrado como " + (tipo === "medicos" ? "médico" : "paciente") + ".");
         }
-
       } catch (error) {
         console.error("Erro no login:", error);
         alert("Email ou senha incorretos.");
@@ -141,17 +134,28 @@
       }
     }
 
-    window.fazerLogin = fazerLogin;
-    window.esqueciSenha = esqueciSenha;
-
-    // 🧪 Funções do MedUtis
+    // Modal MedUtis: iframe carregado só ao clicar
     window.abrirMedutis = () => {
-      document.getElementById("medutisModal").style.display = "flex";
+      const modal = document.getElementById("medutisModal");
+      const content = document.getElementById("medutisModalContent");
+
+      // Adiciona iframe apenas se ainda não foi adicionado
+      if (!document.getElementById("medutisIframe")) {
+        const iframe = document.createElement("iframe");
+        iframe.id = "medutisIframe";
+        iframe.src = "MedUtis/index.html";
+        content.appendChild(iframe);
+      }
+
+      modal.style.display = "flex";
     };
 
     window.fecharMedutis = () => {
       document.getElementById("medutisModal").style.display = "none";
     };
+
+    window.fazerLogin = fazerLogin;
+    window.esqueciSenha = esqueciSenha;
   </script>
 </body>
 </html>

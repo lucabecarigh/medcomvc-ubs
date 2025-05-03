@@ -67,6 +67,11 @@
     }
 
     async function listarPacientes(uidMedico) {
+      console.log("📍 Iniciando leitura de médico...");
+      const refMedico = doc(db, "medicos", uidMedico);
+      const snapMedico = await getDoc(refMedico);
+      console.log("✅ Leitura de médico OK:", snapMedico.exists());
+      
       const container = document.getElementById('lista-pacientes');
       container.innerHTML = "<p>Carregando pacientes...</p>";
 
@@ -97,8 +102,13 @@
         container.innerHTML = "";
 
         for (const uidPaciente of listaPacientes) {
+          
           const refPaciente = doc(db, "pacientes", uidPaciente);
           const snapPaciente = await getDoc(refPaciente);
+          
+          console.log(`📍 Tentando acessar paciente: ${uidPaciente}`);
+          console.log("✅ Leitura de paciente OK:", snapPaciente.exists());
+          
 
           if (snapPaciente.exists()) {
             const dados = snapPaciente.data();
