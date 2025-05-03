@@ -15,6 +15,7 @@
 
   <button class="btn-consultas" onclick="abrirCalendario()">📅 Ver todas as consultas</button>
   <button class="btn-consultas" onclick="abrirModalNovoPaciente()">➕ Adicionar novo paciente</button>
+  <button onclick="sair()">🚪 Sair</button>
   
   <div id="modalNovoPaciente" class="modal" style="display:none;">
     <div class="modal-content">
@@ -51,7 +52,16 @@
   const container = document.getElementById('lista-pacientes');
   container.innerHTML = "<p>Carregando pacientes...</p>";
 
-  const uidMedico = localStorage.getItem("uid");
+  function obterUidDaUrl() {
+  const params = new URLSearchParams(window.location.search);
+  return params.get("uid");
+  }
+
+  const uidMedico = obterUidDaUrl();
+  if (uidMedico) {
+    localStorage.setItem("uid", uidMedico);
+  }
+
   console.log("UID do médico:", uidMedico);
   if (!uidMedico) {
     container.innerHTML = "<p>Erro: médico não identificado.</p>";
