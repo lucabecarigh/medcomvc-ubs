@@ -19,14 +19,17 @@ const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
 // 3) FAZ SIGN-IN ANÔNIMO
+// 3) FAZ SIGN-IN ANÔNIMO apenas quando chamado
 const auth = getAuth(app);
-signInAnonymously(auth)
-  .then(() => {
-    console.log("Sign-in anônimo bem-sucedido!");
-  })
-  .catch((error) => {
-    console.error("Erro ao fazer sign-in anônimo:", error);
-  });
+
+export async function autenticarAnonimamente() {
+  try {
+    await signInAnonymously(auth);
+    console.log("✅ Sign-in anônimo bem-sucedido (MedUtis)");
+  } catch (error) {
+    console.error("❌ Erro ao fazer sign-in anônimo:", error);
+  }
+}
 
 // ====================================================================
 // LÓGICA DO SEU APLICATIVO

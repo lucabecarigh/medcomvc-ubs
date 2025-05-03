@@ -62,20 +62,19 @@
     <button onclick="abrirMedutis()" class="btn-consultas">💊 med.fácil</button>
   </div>
 
-  <!-- Modal do MedUtis (carregará o miniapp com iframe) -->
+  <!-- Modal do MedUtis -->
   <div id="medutisModal">
     <div id="medutisModalContent">
       <span id="medutisModalClose" onclick="fecharMedutis()">✕</span>
-      <!-- iframe carrega a versão isolada do miniapp -->
       <iframe id="iframeMedutis" src=""></iframe>
     </div>
   </div>
 
-  <!-- Firebase principal do app -->
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
     import { getFirestore, doc, getDoc } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
     import { getAuth, signInWithEmailAndPassword, sendPasswordResetEmail } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-auth.js";
+    import { autenticarAnonimamente } from "./MedUtis/script.js";
 
     const firebaseConfig = {
       apiKey: "AIzaSyAmF5FS_ekWW_7-1RUHtGCR71LH6r9fg08",
@@ -140,16 +139,20 @@
       }
     }
 
-    // Botão que abre o MedUtis com o iframe apontando só no clique
-    function abrirMedutis() {
-      const iframe = document.getElementById("iframeMedutis");
-      iframe.src = "MedUtis/index.html"; // carrega o miniapp
-      document.getElementById("medutisModal").style.display = "flex";
+    async function abrirMedutis() {
+      try {
+        await autenticarAnonimamente(); // só agora faz login anônimo
+        document.getElementById("iframeMedutis").src = "MedUtis/index.html";
+        document.getElementById("medutisModal").style.display = "flex";
+      } catch (e) {
+        alert("Erro ao abrir MedUtis.");
+        console.error("Erro ao abrir MedUtis:", e);
+      }
     }
 
     function fecharMedutis() {
+      document.getElementById("iframeMedutis").src = "";
       document.getElementById("medutisModal").style.display = "none";
-      document.getElementById("iframeMedutis").src = ""; // limpa o conteúdo
     }
 
     window.fazerLogin = fazerLogin;
