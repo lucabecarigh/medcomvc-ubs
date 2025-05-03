@@ -16,7 +16,7 @@
   <button class="btn-consultas" onclick="abrirCalendario()">📅 Ver todas as consultas</button>
   <button class="btn-consultas" onclick="abrirModalNovoPaciente()">➕ Adicionar novo paciente</button>
   <button onclick="sair()">🚪 Sair</button>
-  
+
   <div id="modalNovoPaciente" class="modal" style="display:none;">
     <div class="modal-content">
       <h2>Novo Paciente</h2>
@@ -30,7 +30,6 @@
     </div>
   </div>
 
-  <!-- Firebase SDK -->
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
     import { getFirestore, doc, getDoc } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
@@ -48,9 +47,10 @@
     const app = initializeApp(firebaseConfig);
     const db = getFirestore(app);
 
+    // Função robusta para pegar o UID do médico
     function obterUidMedico() {
-      const params = new URLSearchParams(window.location.search);
-      const uidFromUrl = params.get("uid");
+      const urlParams = new URLSearchParams(window.location.search);
+      const uidFromUrl = urlParams.get("uid");
       if (uidFromUrl) {
         localStorage.setItem("uid", uidFromUrl);
         return uidFromUrl;
@@ -63,7 +63,7 @@
       container.innerHTML = "<p>Carregando pacientes...</p>";
 
       const uidMedico = obterUidMedico();
-      console.log("UID do médico:", uidMedico);
+      console.log("🔑 UID do médico:", uidMedico);
 
       if (!uidMedico) {
         container.innerHTML = "<p>Erro: médico não identificado.</p>";
@@ -71,57 +71,58 @@
       }
 
       try {
-        const medicoRef = doc(db, "medicos", uidMedico);
-        const medicoSnap = await getDoc(medicoRef);
-        console.log("Dados do médico:", medicoSnap.exists(), medicoSnap.data());
+        const refMedico = doc(db, "medicos", uidMedico);
+        const snapMedico = await getDoc(refMedico);
 
-        if (!medicoSnap.exists()) {
-          container.innerHTML = "<p>Médico não encontrado no Firestore.</p>";
+        if (!snapMedico.exists()) {
+          container.innerHTML = "<p>Médico não encontrado no banco de dados.</p>";
           return;
         }
 
-        const dadosMedico = medicoSnap.data();
-        const meuspacientes = dadosMedico.meuspacientes || [];
-        console.log("IDs dos pacientes vinculados:", meuspacientes);
+        const dadosMedico = snapMedico.data();
+        const listaPacientes = dadosMedico.meuspacientes || [];
 
-        if (meuspacientes.length === 0) {
-          container.innerHTML = "<p>Você ainda não tem pacientes vinculados.</p>";
+        if (listaPacientes.length === 0) {
+          container.innerHTML = "<p>Você ainda não tem pacientes cadastrados.</p>";
           return;
         }
 
         container.innerHTML = "";
 
-        for (const uidPaciente of meuspacientes) {
-          const pacienteRef = doc(db, "pacientes", uidPaciente);
-          const pacienteSnap = await getDoc(pacienteRef);
-          console.log(`Dados do paciente (${uidPaciente}):`, pacienteSnap.exists(), pacienteSnap.data());
+        for (const uidPaciente of listaPacientes) {
+          const refPaciente = doc(db, "pacientes", uidPaciente);
+          const snapPaciente = await getDoc(refPaciente);
 
-          if (pacienteSnap.exists()) {
-            const dadosPaciente = pacienteSnap.data();
-            const identificacao = dadosPaciente.identificacao?.[0] || {};
+          if (snapPaciente.exists()) {
+            const dados = snapPaciente.data();
+            const identificacao = dados.identificacao?.[0] || {};
             const nome = identificacao.nome || "Paciente";
             const sobrenome = identificacao.sobrenome || "";
 
             const div = document.createElement("div");
-            div.classList.add("pasta");
-            div.innerText = `${nome} ${sobrenome}`;
+            div.className = "pasta";
+            div.textContent = `${nome} ${sobrenome}`;
             div.onclick = () => {
               localStorage.setItem("pacienteSelecionado", uidPaciente);
               window.location.href = "paciente_view.html";
             };
             container.appendChild(div);
           } else {
-            console.warn(`Paciente com UID ${uidPaciente} não encontrado no Firestore.`);
+            const aviso = document.createElement("div");
+            aviso.className = "pasta";
+            aviso.textContent = `⚠️ Paciente não encontrado: ${uidPaciente}`;
+            aviso.style.color = "red";
+            container.appendChild(aviso);
           }
         }
-      } catch (error) {
-        console.error("Erro ao carregar pacientes:", error);
-        container.innerHTML = "<p>Erro ao carregar pacientes.</p>";
+      } catch (e) {
+        console.error("❌ Erro ao buscar pacientes:", e);
+        container.innerHTML = "<p>Erro ao carregar pacientes. Verifique o console.</p>";
       }
     }
 
     function abrirCalendario() {
-      alert("Exibir calendário com todas as consultas.");
+      alert("🔔 Ver todas as consultas");
     }
 
     function abrirModalNovoPaciente() {
@@ -137,9 +138,7 @@
       window.location.href = "index.html";
     }
 
-    window.addEventListener("DOMContentLoaded", () => {
-      listarPacientes();
-    });
+    window.addEventListener("DOMContentLoaded", listarPacientes);
   </script>
 </body>
 </html>
