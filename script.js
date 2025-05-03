@@ -112,9 +112,15 @@ function verConsultas() {
   abrirPasta("calendario");
 }
 
+function sair() {
+  localStorage.removeItem("uid");
+  window.location.href = "index.html";
+}
+
 // exportar para usar no HTML se quiser
 window.abrirModalNovoPaciente = abrirModalNovoPaciente;
 window.fecharModalNovoPaciente = fecharModalNovoPaciente;
 window.salvarNovoPaciente = salvarNovoPaciente;
 window.abrirPasta = abrirPasta;
 window.verConsultas = verConsultas;
+window.sair = sair;

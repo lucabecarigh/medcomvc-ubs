@@ -111,9 +111,9 @@
 
         if (docRef.exists()) {
           if (tipo === "medicos") {
-            window.location.href = "medico.html";
+            window.location.href = `medico.html?uid=${uid}`;
           } else {
-            window.location.href = "paciente.html";
+            window.location.href = `paciente.html?uid=${uid}`;
           }
         } else {
           alert("Usuário não está registrado como " + (tipo === "medicos" ? "médico" : "paciente") + ".");
