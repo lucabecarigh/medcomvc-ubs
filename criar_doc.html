@@ -5,6 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Criar Documento</title>
   <link rel="stylesheet" href="style.css">
+  <!-- CKEditor CDN -->
+  <script src="https://cdn.ckeditor.com/ckeditor5/41.4.2/classic/ckeditor.js"></script>
 </head>
 <body>
   <h1>📝 Criar Novo Documento</h1>
@@ -19,7 +21,8 @@
   </select>
 
   <br><br>
-  <textarea id="conteudo" placeholder="Digite o conteúdo aqui..." rows="15" style="width:100%;"></textarea>
+  <div id="editor" style="background: #fff; border: 1px solid #ccc; min-height: 300px;"></div>
+
   <br><br>
   <button onclick="salvarDocumento()">💾 Salvar</button>
   <button onclick="voltar()">🔙 Voltar</button>
@@ -47,35 +50,49 @@
     const pacienteId = localStorage.getItem("pacienteSelecionado");
     const medicoId = localStorage.getItem("uid");
 
+    let editorInstance;
+
+    ClassicEditor
+      .create(document.querySelector('#editor'))
+      .then(editor => {
+        editorInstance = editor;
+      })
+      .catch(error => {
+        console.error("Erro ao carregar CKEditor:", error);
+      });
+
     window.salvarDocumento = async function () {
       const tipo = document.getElementById("tipo").value;
-      const texto = document.getElementById("conteudo").value.trim();
+      const textoHTML = editorInstance.getData().trim();
 
-      if (!pacienteId || !tipo || !texto) {
+      if (!pacienteId || !tipo || !textoHTML || !medicoId) {
         alert("Preencha o conteúdo e escolha uma pasta.");
         return;
       }
 
       try {
-        // 1. Adiciona o texto no Firestore
+        // 🔹 1. Salvar texto HTML no Firestore
         const refDoc = doc(db, "pacientes", pacienteId);
         const snap = await getDoc(refDoc);
         if (!snap.exists()) throw new Error("Paciente não encontrado.");
 
         const dados = snap.data();
         const arrayAtual = Array.isArray(dados[tipo]) ? dados[tipo] : [];
-        arrayAtual.push(texto);
-        await updateDoc(refDoc, { [tipo]: arrayAtual });
+        arrayAtual.push(textoHTML);
 
-        // 2. Gera o nome do PDF
+        await updateDoc(refDoc, {
+          [tipo]: arrayAtual
+        });
+
+        // 🔹 2. Gerar nome de arquivo
         const agora = new Date();
-        const data = agora.toLocaleDateString('pt-BR').replaceAll("/", "-");
-        const hora = agora.toLocaleTimeString('pt-BR').replaceAll(":", "-");
+        const data = agora.toLocaleDateString("pt-BR").replace(/\//g, "-");
+        const hora = agora.toTimeString().split(" ")[0].slice(0, 5).replace(":", "-");
         const nomePDF = `${pacienteId}_${tipo}_${data}_${hora}_${medicoId}.pdf`;
 
-        // 3. Cria o conteúdo do PDF
+        // 🔹 3. Criar PDF com html2pdf
         const elementoPDF = document.createElement("div");
-        elementoPDF.innerHTML = `<h1>${tipo.charAt(0).toUpperCase() + tipo.slice(1)}</h1><pre>${texto}</pre>`;
+        elementoPDF.innerHTML = `<h1>Documento (${tipo})</h1>${textoHTML}`;
 
         const opt = {
           margin: 1,
@@ -85,8 +102,8 @@
           jsPDF: { unit: "in", format: "a4", orientation: "portrait" }
         };
 
-        // 4. Gera e envia o PDF
         const pdfBlob = await html2pdf().from(elementoPDF).set(opt).outputPdf("blob");
+
         const storageRef = ref(storage, `pacientes/${pacienteId}/${tipo}/${nomePDF}`);
         await uploadBytes(storageRef, pdfBlob);
 

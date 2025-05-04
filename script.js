@@ -26,7 +26,8 @@ function fecharModalNovoPaciente() {
 }
 
 function fecharUpload() {
-  document.getElementById("modalUploadArquivo").style.display = "none";
+  const modal = document.getElementById("modalUploadArquivo");
+  if (modal) modal.style.display = "none";
   window.location.href = "paciente_view.html";
 }
 
@@ -85,7 +86,7 @@ async function salvarNovoPaciente() {
   }
 }
 
-// ========== UPLOAD DE ARQUIVO ==========
+// ========== UPLOAD DE ARQUIVO EXISTENTE ==========
 async function uploadArquivo() {
   const tipo = document.getElementById("tipoArquivo").value;
   const arquivo = document.getElementById("arquivoInput").files[0];
@@ -103,14 +104,14 @@ async function uploadArquivo() {
     const storageRef = ref(storage, caminho);
     await uploadBytes(storageRef, arquivo);
     alert("Arquivo enviado com sucesso!");
-    fecharUpload(); // fecha modal e volta ao paciente_view
+    fecharUpload();
   } catch (error) {
     console.error("Erro ao enviar arquivo:", error);
     alert("Erro ao enviar o arquivo.");
   }
 }
 
-// ========== FUNÇÕES DE NAVEGAÇÃO ==========
+// ========== NAVEGAÇÃO ==========
 function abrirPasta(nome) {
   const pacienteId = localStorage.getItem("pacienteSelecionado");
   if (!pacienteId) {
@@ -136,7 +137,7 @@ function fecharMedutis() {
   document.getElementById("medutisModal").style.display = "none";
 }
 
-// ========== LINKS DIRETOS ==========
+// ========== ATALHOS ==========
 function abrirResumo() { window.location.href = "resumo.html"; }
 function abrirDocumento() { window.location.href = "documento.html"; }
 function abrirExame() { window.location.href = "exame.html"; }
