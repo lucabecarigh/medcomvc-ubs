@@ -3,131 +3,105 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>📝 Novo Documento</title>
-  <link rel="stylesheet" href="style.css" />
-  <style>
-    #toolbar {
-      display: flex;
-      justify-content: space-between;
-      padding: 10px;
-      background: #f2f2f2;
-      border-bottom: 1px solid #ccc;
-    }
-
-    #editor {
-      width: 100%;
-      height: 80vh;
-      padding: 20px;
-      outline: none;
-      border: none;
-      font-size: 16px;
-      background: #fff;
-    }
-
-    #actions {
-      display: flex;
-      gap: 10px;
-      align-items: center;
-    }
-
-    select, button {
-      padding: 8px;
-      font-size: 14px;
-    }
-  </style>
+  <title>Criar Documento</title>
+  <link rel="stylesheet" href="style.css">
 </head>
 <body>
+  <h1>📝 Criar Novo Documento</h1>
 
-<div id="toolbar">
-  <h2>🩺 Editor do Médico</h2>
-  <div id="actions">
-    <select id="destino">
-      <option value="documento">📄 Documento</option>
-      <option value="exame">🧪 Exame</option>
-      <option value="prontuario">📘 Prontuário</option>
-      <option value="resumo">📋 Resumo</option>
-      <option value="tratamento">💊 Tratamento</option>
-    </select>
-    <button id="btnSalvar">💾 Salvar</button>
-  </div>
-</div>
+  <label for="tipo">Escolha a pasta:</label>
+  <select id="tipo">
+    <option value="resumo">Resumo</option>
+    <option value="prontuario">Prontuário</option>
+    <option value="exame">Exame</option>
+    <option value="tratamento">Tratamento</option>
+    <option value="documento">Documento</option>
+  </select>
 
-<div id="editor" contenteditable="true">
-  <p>Escreva aqui...</p>
-</div>
+  <br><br>
+  <textarea id="conteudo" placeholder="Digite o conteúdo aqui..." rows="15" style="width:100%;"></textarea>
+  <br><br>
+  <button onclick="salvarDocumento()">💾 Salvar</button>
+  <button onclick="voltar()">🔙 Voltar</button>
 
-<!-- Scripts no final do body para garantir funcionamento -->
-<script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-storage-compat.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/html2pdf.js@0.10.1/dist/html2pdf.bundle.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 
-<script>
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
+    import { getFirestore, doc, getDoc, updateDoc } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
+    import { getStorage, ref, uploadBytes } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-storage.js";
+
     const firebaseConfig = {
       apiKey: "AIzaSyAmF5FS_ekWW_7-1RUHtGCR71LH6r9fg08",
       authDomain: "medcomvc-ubs.firebaseapp.com",
       projectId: "medcomvc-ubs",
-      storageBucket: "medcomvc-ubs.appspot.com",
+      storageBucket: "medcomvc-ubs.firebasestorage.app",
       messagingSenderId: "313420248004",
       appId: "1:313420248004:web:a9a28d97b3ef2e33c36a91"
     };
-  
-    firebase.initializeApp(firebaseConfig);
-    const db = firebase.firestore();
-    const storage = firebase.storage();
-  
-    window.onload = () => {
-      document.getElementById("btnSalvar").addEventListener("click", salvarDocumento);
-    };
-  
-    async function salvarDocumento() {
-      const destino = document.getElementById("destino").value;
-      const pacienteId = localStorage.getItem("pacienteSelecionado");
-      const editor = document.getElementById("editor");
-      const textoHTML = editor.innerHTML;
-      const textoPlano = editor.innerText.trim();
-  
-      if (!pacienteId || !destino || !textoPlano) {
-        alert("Preencha todas as informações.");
+
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+    const storage = getStorage(app, "gs://medcomvc-ubs.firebasestorage.app");
+
+    const pacienteId = localStorage.getItem("pacienteSelecionado");
+    const medicoId = localStorage.getItem("uid");
+
+    window.salvarDocumento = async function () {
+      const tipo = document.getElementById("tipo").value;
+      const texto = document.getElementById("conteudo").value.trim();
+
+      if (!pacienteId || !tipo || !texto) {
+        alert("Preencha o conteúdo e escolha uma pasta.");
         return;
       }
-  
-      try {
-        // 1. Salvar texto no Firestore
-        const refPaciente = db.collection("pacientes").doc(pacienteId);
-        await refPaciente.update({
-          [destino]: firebase.firestore.FieldValue.arrayUnion(textoPlano)
-        });
-  
-        // 2. Gerar PDF DOM clone temporário
-        const clone = editor.cloneNode(true);
-        document.body.appendChild(clone);
-  
-        const opt = {
-          margin: 10,
-          filename: 'documento.pdf',
-          image: { type: 'jpeg', quality: 0.98 },
-          html2canvas: { scale: 2 },
-          jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
-        };
-  
-        // 3. Usar html2pdf para gerar PDF e capturar como blob
-        const pdfBlob = await html2pdf().set(opt).from(clone).output('blob');
-        document.body.removeChild(clone);
-  
-        // 4. Upload no Firebase Storage
-        const caminho = `pacientes/${pacienteId}/${destino}/${Date.now()}.pdf`;
-        const storageRef = storage.ref().child(caminho);
-        await storageRef.put(pdfBlob);
-  
-        alert("✅ Documento salvo com sucesso!");
-        window.location.href = "paciente_view.html";
-      } catch (error) {
-        console.error("❌ Erro ao salvar:", error);
-        alert("Erro ao salvar: " + error.message);
-      }
-    }
-  </script>
 
+      try {
+        // 1. Adiciona o texto no Firestore
+        const refDoc = doc(db, "pacientes", pacienteId);
+        const snap = await getDoc(refDoc);
+        if (!snap.exists()) throw new Error("Paciente não encontrado.");
+
+        const dados = snap.data();
+        const arrayAtual = Array.isArray(dados[tipo]) ? dados[tipo] : [];
+        arrayAtual.push(texto);
+        await updateDoc(refDoc, { [tipo]: arrayAtual });
+
+        // 2. Gera o nome do PDF
+        const agora = new Date();
+        const data = agora.toLocaleDateString('pt-BR').replaceAll("/", "-");
+        const hora = agora.toLocaleTimeString('pt-BR').replaceAll(":", "-");
+        const nomePDF = `${pacienteId}_${tipo}_${data}_${hora}_${medicoId}.pdf`;
+
+        // 3. Cria o conteúdo do PDF
+        const elementoPDF = document.createElement("div");
+        elementoPDF.innerHTML = `<h1>${tipo.charAt(0).toUpperCase() + tipo.slice(1)}</h1><pre>${texto}</pre>`;
+
+        const opt = {
+          margin: 1,
+          filename: nomePDF,
+          image: { type: "jpeg", quality: 0.98 },
+          html2canvas: { scale: 2 },
+          jsPDF: { unit: "in", format: "a4", orientation: "portrait" }
+        };
+
+        // 4. Gera e envia o PDF
+        const pdfBlob = await html2pdf().from(elementoPDF).set(opt).outputPdf("blob");
+        const storageRef = ref(storage, `pacientes/${pacienteId}/${tipo}/${nomePDF}`);
+        await uploadBytes(storageRef, pdfBlob);
+
+        alert("Documento salvo com sucesso!");
+        window.location.href = "paciente_view.html";
+
+      } catch (error) {
+        console.error("Erro ao salvar documento:", error);
+        alert("Erro ao salvar.");
+      }
+    };
+
+    window.voltar = function () {
+      window.location.href = "paciente_view.html";
+    };
+  </script>
 </body>
 </html>
