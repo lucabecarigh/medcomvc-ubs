@@ -5,38 +5,30 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Criar Documento</title>
   <link rel="stylesheet" href="style.css">
-
-  <!-- TinyMCE via CDN MIT (sem API key) -->
   <script src="https://cdn.jsdelivr.net/npm/tinymce@6.8.3/tinymce.min.js"></script>
-
   <style>
     body {
       background: #f2f6f8;
       padding: 20px;
       font-family: sans-serif;
     }
-
     h1 {
       text-align: center;
     }
-
     #editor-container {
       max-width: 1000px;
       margin: auto;
     }
-
     textarea#editor {
       min-height: 500px;
     }
-
-    button {
-      margin: 10px;
-      padding: 10px 20px;
-      cursor: pointer;
-    }
-
     .center {
       text-align: center;
+      margin-bottom: 20px;
+    }
+    select, button {
+      margin: 5px;
+      padding: 8px 15px;
     }
   </style>
 </head>
@@ -52,9 +44,19 @@
       <option value="tratamento">Tratamento</option>
       <option value="documento">Documento</option>
     </select>
-  </div>
 
-  <br>
+    <label for="template">Escolha um modelo:</label>
+    <select id="template">
+      <option value="">-- Nenhum --</option>
+      <option value="primeira_adulto">1ª Consulta Adulto</option>
+      <option value="primeira_pediatria">1ª Consulta Pediatria</option>
+      <option value="puericultura">Puericultura</option>
+      <option value="pre_natal">Pré-natal</option>
+      <option value="rotina_adulto">Rotina Adulto</option>
+      <option value="rotina_pediatria">Rotina Pediatria</option>
+      <option value="demanda_espontanea">Demanda Espontânea</option>
+    </select>
+  </div>
 
   <div id="editor-container">
     <textarea id="editor"></textarea>
@@ -70,7 +72,7 @@
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
     import { getFirestore, doc, getDoc, updateDoc } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
-    import { getStorage, ref, uploadBytes } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-storage.js";
+    import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-storage.js";
 
     const firebaseConfig = {
       apiKey: "AIzaSyAmF5FS_ekWW_7-1RUHtGCR71LH6r9fg08",
@@ -101,18 +103,12 @@
           const file = blobInfo.blob();
           const filename = `imagem_${Date.now()}.jpg`;
           const caminho = `pacientes/${pacienteId}/imagens/${filename}`;
-
           const storageRef = ref(storage, caminho);
           await uploadBytes(storageRef, file);
-
-          // Gera a URL de download
-          const { getDownloadURL } = await import("https://www.gstatic.com/firebasejs/10.8.1/firebase-storage.js");
           const url = await getDownloadURL(storageRef);
-
-          success(url); // Insere a imagem no editor
-
+          success(url);
         } catch (err) {
-          console.error("Erro no upload de imagem:", err);
+          console.error("Erro no upload da imagem:", err);
           failure("Erro ao enviar imagem.");
         }
       },
@@ -122,33 +118,44 @@
           const input = document.createElement('input');
           input.setAttribute('type', 'file');
           input.setAttribute('accept', 'image/*');
-
           input.onchange = function () {
             const file = this.files[0];
             const reader = new FileReader();
-
             reader.onload = function () {
               const id = 'blobid' + (new Date()).getTime();
               const blobCache = tinymce.activeEditor.editorUpload.blobCache;
               const base64 = reader.result.split(',')[1];
               const blobInfo = blobCache.create(id, file, base64);
               blobCache.add(blobInfo);
-
               callback(blobInfo.blobUri(), { title: file.name });
             };
-
             reader.readAsDataURL(file);
           };
-
           input.click();
         }
       },
-      content_style: `
-        body { font-family: Helvetica, Arial, sans-serif; font-size: 14px; padding: 20px; }
-        img { max-width: 100%; height: auto; }
-      `
+      content_style: `body { font-family: Helvetica, Arial, sans-serif; font-size: 14px; padding: 20px; } img { max-width: 100%; height: auto; }`
     });
 
+    // 🔹 Carregar modelo de template ao mudar o select
+    document.getElementById("template").addEventListener("change", async function () {
+      const modelo = this.value;
+      if (!modelo) return;
+
+      try {
+        const refDoc = doc(db, "templates", modelo);
+        const snap = await getDoc(refDoc);
+        if (!snap.exists()) throw new Error("Modelo não encontrado.");
+
+        const textoHTML = snap.data().v1 || "";
+        tinymce.get("editor").setContent(textoHTML);
+      } catch (error) {
+        console.error("Erro ao carregar modelo:", error);
+        alert("Erro ao carregar o modelo.");
+      }
+    });
+
+    // 🔹 Salvar documento
     window.salvarDocumento = async function () {
       const tipo = document.getElementById("tipo").value;
       const htmlContent = tinymce.get("editor").getContent().trim();
@@ -167,7 +174,6 @@
         const dados = snap.data();
         const arrayAtual = Array.isArray(dados[tipo]) ? dados[tipo] : [];
         arrayAtual.push(plainText);
-
         await updateDoc(refDoc, { [tipo]: arrayAtual });
 
         const agora = new Date();
