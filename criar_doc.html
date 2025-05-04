@@ -5,27 +5,65 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Criar Documento</title>
   <link rel="stylesheet" href="style.css">
-  <!-- CKEditor CDN -->
-  <script src="https://cdn.ckeditor.com/ckeditor5/41.4.2/classic/ckeditor.js"></script>
+
+  <!-- TinyMCE via CDN MIT (sem API key) -->
+  <script src="https://cdn.jsdelivr.net/npm/tinymce@6.8.3/tinymce.min.js"></script>
+
+  <style>
+    body {
+      background: #f2f6f8;
+      padding: 20px;
+      font-family: sans-serif;
+    }
+
+    h1 {
+      text-align: center;
+    }
+
+    #editor-container {
+      max-width: 1000px;
+      margin: auto;
+    }
+
+    textarea#editor {
+      min-height: 500px;
+    }
+
+    button {
+      margin: 10px;
+      padding: 10px 20px;
+      cursor: pointer;
+    }
+
+    .center {
+      text-align: center;
+    }
+  </style>
 </head>
 <body>
   <h1>📝 Criar Novo Documento</h1>
 
-  <label for="tipo">Escolha a pasta:</label>
-  <select id="tipo">
-    <option value="resumo">Resumo</option>
-    <option value="prontuario">Prontuário</option>
-    <option value="exame">Exame</option>
-    <option value="tratamento">Tratamento</option>
-    <option value="documento">Documento</option>
-  </select>
+  <div class="center">
+    <label for="tipo">Escolha a pasta:</label>
+    <select id="tipo">
+      <option value="resumo">Resumo</option>
+      <option value="prontuario">Prontuário</option>
+      <option value="exame">Exame</option>
+      <option value="tratamento">Tratamento</option>
+      <option value="documento">Documento</option>
+    </select>
+  </div>
 
-  <br><br>
-  <div id="editor" style="background: #fff; border: 1px solid #ccc; min-height: 300px;"></div>
+  <br>
 
-  <br><br>
-  <button onclick="salvarDocumento()">💾 Salvar</button>
-  <button onclick="voltar()">🔙 Voltar</button>
+  <div id="editor-container">
+    <textarea id="editor"></textarea>
+  </div>
+
+  <div class="center">
+    <button onclick="salvarDocumento()">💾 Salvar</button>
+    <button onclick="voltar()">🔙 Voltar</button>
+  </div>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 
@@ -50,49 +88,95 @@
     const pacienteId = localStorage.getItem("pacienteSelecionado");
     const medicoId = localStorage.getItem("uid");
 
-    let editorInstance;
+    tinymce.init({
+      selector: '#editor',
+      height: 500,
+      menubar: false,
+      plugins: 'lists image',
+      toolbar: 'undo redo | bold italic underline | bullist numlist | image',
+      branding: false,
+      automatic_uploads: true,
+      images_upload_handler: async function (blobInfo, success, failure) {
+        try {
+          const file = blobInfo.blob();
+          const filename = `imagem_${Date.now()}.jpg`;
+          const caminho = `pacientes/${pacienteId}/imagens/${filename}`;
 
-    ClassicEditor
-      .create(document.querySelector('#editor'))
-      .then(editor => {
-        editorInstance = editor;
-      })
-      .catch(error => {
-        console.error("Erro ao carregar CKEditor:", error);
-      });
+          const storageRef = ref(storage, caminho);
+          await uploadBytes(storageRef, file);
+
+          // Gera a URL de download
+          const { getDownloadURL } = await import("https://www.gstatic.com/firebasejs/10.8.1/firebase-storage.js");
+          const url = await getDownloadURL(storageRef);
+
+          success(url); // Insere a imagem no editor
+
+        } catch (err) {
+          console.error("Erro no upload de imagem:", err);
+          failure("Erro ao enviar imagem.");
+        }
+      },
+      file_picker_types: 'image',
+      file_picker_callback: function (callback, value, meta) {
+        if (meta.filetype === 'image') {
+          const input = document.createElement('input');
+          input.setAttribute('type', 'file');
+          input.setAttribute('accept', 'image/*');
+
+          input.onchange = function () {
+            const file = this.files[0];
+            const reader = new FileReader();
+
+            reader.onload = function () {
+              const id = 'blobid' + (new Date()).getTime();
+              const blobCache = tinymce.activeEditor.editorUpload.blobCache;
+              const base64 = reader.result.split(',')[1];
+              const blobInfo = blobCache.create(id, file, base64);
+              blobCache.add(blobInfo);
+
+              callback(blobInfo.blobUri(), { title: file.name });
+            };
+
+            reader.readAsDataURL(file);
+          };
+
+          input.click();
+        }
+      },
+      content_style: `
+        body { font-family: Helvetica, Arial, sans-serif; font-size: 14px; padding: 20px; }
+        img { max-width: 100%; height: auto; }
+      `
+    });
 
     window.salvarDocumento = async function () {
       const tipo = document.getElementById("tipo").value;
-      const textoHTML = editorInstance.getData().trim();
+      const htmlContent = tinymce.get("editor").getContent().trim();
+      const plainText = tinymce.get("editor").getContent({ format: "text" }).replace(/\s+/g, " ").trim();
 
-      if (!pacienteId || !tipo || !textoHTML || !medicoId) {
+      if (!pacienteId || !tipo || !htmlContent || !medicoId) {
         alert("Preencha o conteúdo e escolha uma pasta.");
         return;
       }
 
       try {
-        // 🔹 1. Salvar texto HTML no Firestore
         const refDoc = doc(db, "pacientes", pacienteId);
         const snap = await getDoc(refDoc);
         if (!snap.exists()) throw new Error("Paciente não encontrado.");
 
         const dados = snap.data();
         const arrayAtual = Array.isArray(dados[tipo]) ? dados[tipo] : [];
-        arrayAtual.push(textoHTML);
+        arrayAtual.push(plainText);
 
-        await updateDoc(refDoc, {
-          [tipo]: arrayAtual
-        });
+        await updateDoc(refDoc, { [tipo]: arrayAtual });
 
-        // 🔹 2. Gerar nome de arquivo
         const agora = new Date();
         const data = agora.toLocaleDateString("pt-BR").replace(/\//g, "-");
-        const hora = agora.toTimeString().split(" ")[0].slice(0, 5).replace(":", "-");
+        const hora = agora.toTimeString().slice(0, 5).replace(":", "-");
         const nomePDF = `${pacienteId}_${tipo}_${data}_${hora}_${medicoId}.pdf`;
 
-        // 🔹 3. Criar PDF com html2pdf
         const elementoPDF = document.createElement("div");
-        elementoPDF.innerHTML = `<h1>Documento (${tipo})</h1>${textoHTML}`;
+        elementoPDF.innerHTML = `<h1>Documento (${tipo})</h1>${htmlContent}`;
 
         const opt = {
           margin: 1,
@@ -103,7 +187,6 @@
         };
 
         const pdfBlob = await html2pdf().from(elementoPDF).set(opt).outputPdf("blob");
-
         const storageRef = ref(storage, `pacientes/${pacienteId}/${tipo}/${nomePDF}`);
         await uploadBytes(storageRef, pdfBlob);
 
