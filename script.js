@@ -3,12 +3,20 @@ console.log("✅ script.js carregado!");
 import {
   doc,
   setDoc,
-  getDoc,
-  collection
+  getDoc
 } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
 
-import { db } from "./firebase-config.js";
+import {
+  getStorage,
+  ref,
+  uploadBytes
+} from "https://www.gstatic.com/firebasejs/10.8.1/firebase-storage.js";
 
+// Firebase config personalizado
+import { app, db } from "./firebase-config.js";
+const storage = getStorage(app, "gs://medcomvc-ubs.firebasestorage.app");
+
+// ========== MODAIS ==========
 function abrirModalNovoPaciente() {
   document.getElementById("modalNovoPaciente").style.display = "flex";
 }
@@ -17,6 +25,12 @@ function fecharModalNovoPaciente() {
   document.getElementById("modalNovoPaciente").style.display = "none";
 }
 
+function fecharUpload() {
+  document.getElementById("modalUploadArquivo").style.display = "none";
+  window.location.href = "paciente_view.html";
+}
+
+// ========== SALVAR NOVO PACIENTE ==========
 async function salvarNovoPaciente() {
   const nome = document.getElementById("novo-nome").value.trim();
   const sobrenome = document.getElementById("novo-sobrenome").value.trim();
@@ -31,9 +45,8 @@ async function salvarNovoPaciente() {
   }
 
   try {
-    const uidPaciente = crypto.randomUUID(); // gerar UID aleatório, ou use do Firebase Auth se quiser
+    const uidPaciente = crypto.randomUUID();
 
-    // Criar documento do paciente
     await setDoc(doc(db, "pacientes", uidPaciente), {
       criadoEm: new Date().toISOString(),
       identificacao: [{
@@ -44,15 +57,14 @@ async function salvarNovoPaciente() {
         estado
       }],
       meusmedicos: [medicoId],
-      calendario: [{}],
-      documento: [{}],
-      exame: [{}],
-      prontuario: [{}],
-      resumo: [{}],
-      tratamento: [{}]
+      calendario: [],
+      documento: [],
+      exame: [],
+      prontuario: [],
+      resumo: [],
+      tratamento: []
     });
 
-    // Atualizar documento do médico para adicionar esse paciente na lista
     const refMedico = doc(db, "medicos", medicoId);
     const docMedico = await getDoc(refMedico);
     const dados = docMedico.data();
@@ -63,7 +75,6 @@ async function salvarNovoPaciente() {
     alert("Paciente adicionado com sucesso!");
     fecharModalNovoPaciente();
 
-    // Recarregar a lista de pacientes
     if (typeof listarPacientes === "function") {
       listarPacientes();
     }
@@ -74,57 +85,76 @@ async function salvarNovoPaciente() {
   }
 }
 
-// função para abrir pastas do paciente
-async function abrirPasta(nome) {
+// ========== UPLOAD DE ARQUIVO ==========
+async function uploadArquivo() {
+  const tipo = document.getElementById("tipoArquivo").value;
+  const arquivo = document.getElementById("arquivoInput").files[0];
+  const pacienteId = localStorage.getItem("pacienteSelecionado");
+
+  if (!arquivo || !pacienteId || !tipo) {
+    alert("Preencha todos os campos e selecione um arquivo.");
+    return;
+  }
+
+  const timestamp = new Date().getTime();
+  const caminho = `pacientes/${pacienteId}/${tipo}/${arquivo.name}_${timestamp}`;
+
+  try {
+    const storageRef = ref(storage, caminho);
+    await uploadBytes(storageRef, arquivo);
+    alert("Arquivo enviado com sucesso!");
+    fecharUpload(); // fecha modal e volta ao paciente_view
+  } catch (error) {
+    console.error("Erro ao enviar arquivo:", error);
+    alert("Erro ao enviar o arquivo.");
+  }
+}
+
+// ========== FUNÇÕES DE NAVEGAÇÃO ==========
+function abrirPasta(nome) {
   const pacienteId = localStorage.getItem("pacienteSelecionado");
   if (!pacienteId) {
     alert("Paciente não selecionado.");
     return;
   }
-
-  try {
-    const ref = doc(db, "pacientes", pacienteId);
-    const snap = await getDoc(ref);
-
-    if (!snap.exists()) {
-      alert("Paciente não encontrado.");
-      return;
-    }
-
-    const dados = snap.data();
-    const pasta = dados[nome];
-
-    if (Array.isArray(pasta)) {
-      console.log(`📂 Pasta ${nome} tem ${pasta.length} item(ns):`, pasta);
-      alert(`Abrindo pasta '${nome}' do paciente ${pacienteId}.`);
-    } else {
-      alert(`Pasta '${nome}' está vazia ou não existe.`);
-    }
-
-  } catch (error) {
-    console.error("Erro ao abrir pasta:", error);
-    alert("Erro ao abrir pasta.");
-  }
+  localStorage.setItem("pastaSelecionada", nome);
+  window.location.href = `${nome}.html`;
 }
 
-// função de atalho
 function verConsultas() {
   abrirPasta("calendario");
 }
 
-// exportar para usar no HTML se quiser
+function abrirMedutis() {
+  const iframe = document.getElementById("iframeMedutis");
+  iframe.src = "MedUtis/index.html";
+  document.getElementById("medutisModal").style.display = "flex";
+}
+
+function fecharMedutis() {
+  document.getElementById("iframeMedutis").src = "";
+  document.getElementById("medutisModal").style.display = "none";
+}
+
+// ========== LINKS DIRETOS ==========
+function abrirResumo() { window.location.href = "resumo.html"; }
+function abrirDocumento() { window.location.href = "documento.html"; }
+function abrirExame() { window.location.href = "exame.html"; }
+function abrirProntuario() { window.location.href = "prontuario.html"; }
+function abrirTratamento() { window.location.href = "tratamento.html"; }
+
+// ========== EXPORTAR PARA HTML ==========
 window.abrirModalNovoPaciente = abrirModalNovoPaciente;
 window.fecharModalNovoPaciente = fecharModalNovoPaciente;
 window.salvarNovoPaciente = salvarNovoPaciente;
 window.abrirPasta = abrirPasta;
 window.verConsultas = verConsultas;
-window.abrirMedutis = () => {
-  const iframe = document.getElementById("iframeMedutis");
-  iframe.src = "MedUtis/index.html"; // SÓ carrega agora
-  document.getElementById("medutisModal").style.display = "flex";
-};
-
-window.fecharMedutis = () => {
-  document.getElementById("iframeMedutis").src = ""; // DESCONECTA o conteúdo
-  document.getElementById("medutisModal").style.display = "none";
-};
+window.abrirMedutis = abrirMedutis;
+window.fecharMedutis = fecharMedutis;
+window.abrirResumo = abrirResumo;
+window.abrirDocumento = abrirDocumento;
+window.abrirExame = abrirExame;
+window.abrirProntuario = abrirProntuario;
+window.abrirTratamento = abrirTratamento;
+window.uploadArquivo = uploadArquivo;
+window.fecharUpload = fecharUpload;

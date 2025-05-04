@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Resumo do Paciente</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <h1>📄 Resumo do Paciente</h1>
+  <div id="resumoContainer">
+    <p>Carregando textos e PDFs...</p>
+  </div>
+
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
+    import { getFirestore, doc, getDoc } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
+    import { getStorage, ref, listAll, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-storage.js";
+
+    // 🔐 CONFIG
+    const firebaseConfig = {
+      apiKey: "AIzaSyAmF5FS_ekWW_7-1RUHtGCR71LH6r9fg08",
+      authDomain: "medcomvc-ubs.firebaseapp.com",
+      projectId: "medcomvc-ubs",
+      storageBucket: "medcomvc-ubs.firebasestorage.app",
+      messagingSenderId: "313420248004",
+      appId: "1:313420248004:web:a9a28d97b3ef2e33c36a91"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+    const storage = getStorage(app, "gs://medcomvc-ubs.firebasestorage.app");
+
+    const pacienteId = localStorage.getItem("pacienteSelecionado");
+    const pasta = localStorage.getItem("pastaSelecionada") || "resumo";
+    const container = document.getElementById("resumoContainer");
+
+    async function carregarResumo() {
+      if (!pacienteId) {
+        container.innerHTML = "<p>Paciente não selecionado.</p>";
+        return;
+      }
+
+      container.innerHTML = "<p>Carregando textos e PDFs...</p>";
+
+      try {
+        // 🔸 1. TEXTOS DO FIRESTORE
+        const docRef = doc(db, "pacientes", pacienteId);
+        const docSnap = await getDoc(docRef);
+
+        let textos = [];
+        if (docSnap.exists()) {
+          const dados = docSnap.data();
+          textos = dados[pasta] || [];
+        }
+
+        // 🔸 2. LISTAR PDFS DO STORAGE
+        const pastaRef = ref(storage, `pacientes/${pacienteId}/${pasta}`);
+        const lista = await listAll(pastaRef);
+        const urlsPDFs = await Promise.all(
+          lista.items.map(async (item) => {
+            const url = await getDownloadURL(item);
+            return { nome: item.name, url };
+          })
+        );
+
+        // 🔸 3. EXIBIR RESULTADOS
+        container.innerHTML = "";
+
+        // Mostrar textos
+        textos.forEach((texto, index) => {
+          const div = document.createElement("div");
+          div.classList.add("resumo-item");
+          div.innerHTML = `<h3>📝 Texto ${index + 1}</h3><pre>${texto}</pre>`;
+          container.appendChild(div);
+        });
+
+        // Mostrar PDFs
+        urlsPDFs.forEach((pdf) => {
+          const div = document.createElement("div");
+          div.classList.add("resumo-pdf");
+          div.innerHTML = `<h3>📎 ${pdf.nome}</h3><a href="${pdf.url}" target="_blank">📂 Abrir PDF</a>`;
+          container.appendChild(div);
+        });
+
+        if (textos.length === 0 && urlsPDFs.length === 0) {
+          container.innerHTML = "<p>Nenhum conteúdo encontrado na pasta 'resumo'.</p>";
+        }
+      } catch (error) {
+        console.error("❌ Erro ao carregar dados:", error);
+        container.innerHTML = "<p>Erro ao carregar dados.</p>";
+      }
+    }
+
+    carregarResumo();
+  </script>
+</body>
+</html>

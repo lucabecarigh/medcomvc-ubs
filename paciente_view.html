@@ -5,6 +5,35 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Visualizando paciente</title>
   <link rel="stylesheet" href="style.css" />
+  <style>
+    .modal {
+      display: none;
+      position: fixed;
+      z-index: 999;
+      left: 0; top: 0;
+      width: 100%; height: 100%;
+      background-color: rgba(0, 0, 0, 0.6);
+      justify-content: center;
+      align-items: center;
+    }
+    .modal-content {
+      background: #fff;
+      padding: 20px;
+      border-radius: 8px;
+      width: 90%;
+      max-width: 400px;
+      box-shadow: 0 0 10px #333;
+    }
+    #modalUploadArquivo input,
+    #modalUploadArquivo select {
+      width: 100%;
+      padding: 8px;
+      margin-bottom: 10px;
+    }
+    #modalUploadArquivo button {
+      margin-right: 10px;
+    }
+  </style>
 </head>
 <body>
   <h1>👁️ Visualização do Paciente</h1>
@@ -12,10 +41,10 @@
 
   <div class="pastas-container">
     <div class="pasta" onclick="abrirPasta('resumo')">📄 Resumo</div>
-    <div class="pasta" onclick="abrirPasta('prontuarios')">📒 Prontuários</div>
-    <div class="pasta" onclick="abrirPasta('exames')">🧪 Exames</div>
-    <div class="pasta" onclick="abrirPasta('tratamentos')">💊 Tratamentos</div>
-    <div class="pasta" onclick="abrirPasta('documentos')">📁 Documentos</div>
+    <div class="pasta" onclick="abrirPasta('prontuario')">📒 Prontuários</div>
+    <div class="pasta" onclick="abrirPasta('exame')">🧪 Exames</div>
+    <div class="pasta" onclick="abrirPasta('tratamento')">💊 Tratamentos</div>
+    <div class="pasta" onclick="abrirPasta('documento')">📁 Documentos</div>
   </div>
 
   <button class="btn-consultas" onclick="abrirCalendario()">📅 Ver consultas do paciente</button>
@@ -26,15 +55,33 @@
     <button onclick="adicionarArquivoExistente()">📎 Adicionar arquivo existente</button>
   </div>
 
-  <script src="firebase-config.js"></script>
-  <script src="script.js"></script>
+  <!-- Modal de Upload -->
+  <div id="modalUploadArquivo" class="modal">
+    <div class="modal-content">
+      <h2>Adicionar Arquivo Existente</h2>
+      <label for="tipoArquivo">Tipo de arquivo:</label>
+      <select id="tipoArquivo">
+        <option value="resumo">Resumo</option>
+        <option value="prontuario">Prontuário</option>
+        <option value="exame">Exame</option>
+        <option value="tratamento">Tratamento</option>
+        <option value="documento">Documento</option>
+      </select>
+      <input type="file" id="arquivoInput" accept="application/pdf" />
+      <div style="margin-top: 15px;">
+        <button onclick="uploadArquivo()">📤 Enviar</button>
+        <button onclick="fecharUpload()">❌ Cancelar</button>
+      </div>
+    </div>
+  </div>
+
   <script>
     const id = localStorage.getItem("pacienteSelecionado");
     document.getElementById("nomePaciente").innerText = "Visualizando: " + id;
 
     function abrirPasta(pasta) {
-      alert(`Abrindo pasta '${pasta}' do paciente: ` + id);
-      // depois conectar ao Firestore
+      localStorage.setItem("pastaSelecionada", pasta);
+      window.location.href = `${pasta}.html`;
     }
 
     function abrirCalendario() {
@@ -42,12 +89,18 @@
     }
 
     function novoArquivo() {
-      alert("Criar novo arquivo para o paciente: " + id);
+      window.location.href = "criar_doc.html";
     }
 
     function adicionarArquivoExistente() {
-      alert("Anexar arquivo existente para o paciente: " + id);
+      document.getElementById("modalUploadArquivo").style.display = "flex";
+    }
+
+    function fecharUpload() {
+      document.getElementById("modalUploadArquivo").style.display = "none";
     }
   </script>
+
+  <script type="module" src="script.js"></script>
 </body>
 </html>

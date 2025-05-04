@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>📝 Novo Documento</title>
+  <link rel="stylesheet" href="style.css" />
+  <style>
+    #toolbar {
+      display: flex;
+      justify-content: space-between;
+      padding: 10px;
+      background: #f2f2f2;
+      border-bottom: 1px solid #ccc;
+    }
+
+    #editor {
+      width: 100%;
+      height: 80vh;
+      padding: 20px;
+      outline: none;
+      border: none;
+      font-size: 16px;
+      background: #fff;
+    }
+
+    #actions {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+    }
+
+    select, button {
+      padding: 8px;
+      font-size: 14px;
+    }
+  </style>
+</head>
+<body>
+
+<div id="toolbar">
+  <h2>🩺 Editor do Médico</h2>
+  <div id="actions">
+    <select id="destino">
+      <option value="documento">📄 Documento</option>
+      <option value="exame">🧪 Exame</option>
+      <option value="prontuario">📘 Prontuário</option>
+      <option value="resumo">📋 Resumo</option>
+      <option value="tratamento">💊 Tratamento</option>
+    </select>
+    <button id="btnSalvar">💾 Salvar</button>
+  </div>
+</div>
+
+<div id="editor" contenteditable="true">
+  <p>Escreva aqui...</p>
+</div>
+
+<!-- Scripts no final do body para garantir funcionamento -->
+<script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-storage-compat.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/html2pdf.js@0.10.1/dist/html2pdf.bundle.min.js"></script>
+
+<script>
+    const firebaseConfig = {
+      apiKey: "AIzaSyAmF5FS_ekWW_7-1RUHtGCR71LH6r9fg08",
+      authDomain: "medcomvc-ubs.firebaseapp.com",
+      projectId: "medcomvc-ubs",
+      storageBucket: "medcomvc-ubs.appspot.com",
+      messagingSenderId: "313420248004",
+      appId: "1:313420248004:web:a9a28d97b3ef2e33c36a91"
+    };
+  
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.firestore();
+    const storage = firebase.storage();
+  
+    window.onload = () => {
+      document.getElementById("btnSalvar").addEventListener("click", salvarDocumento);
+    };
+  
+    async function salvarDocumento() {
+      const destino = document.getElementById("destino").value;
+      const pacienteId = localStorage.getItem("pacienteSelecionado");
+      const editor = document.getElementById("editor");
+      const textoHTML = editor.innerHTML;
+      const textoPlano = editor.innerText.trim();
+  
+      if (!pacienteId || !destino || !textoPlano) {
+        alert("Preencha todas as informações.");
+        return;
+      }
+  
+      try {
+        // 1. Salvar texto no Firestore
+        const refPaciente = db.collection("pacientes").doc(pacienteId);
+        await refPaciente.update({
+          [destino]: firebase.firestore.FieldValue.arrayUnion(textoPlano)
+        });
+  
+        // 2. Gerar PDF DOM clone temporário
+        const clone = editor.cloneNode(true);
+        document.body.appendChild(clone);
+  
+        const opt = {
+          margin: 10,
+          filename: 'documento.pdf',
+          image: { type: 'jpeg', quality: 0.98 },
+          html2canvas: { scale: 2 },
+          jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+        };
+  
+        // 3. Usar html2pdf para gerar PDF e capturar como blob
+        const pdfBlob = await html2pdf().set(opt).from(clone).output('blob');
+        document.body.removeChild(clone);
+  
+        // 4. Upload no Firebase Storage
+        const caminho = `pacientes/${pacienteId}/${destino}/${Date.now()}.pdf`;
+        const storageRef = storage.ref().child(caminho);
+        await storageRef.put(pdfBlob);
+  
+        alert("✅ Documento salvo com sucesso!");
+        window.location.href = "paciente_view.html";
+      } catch (error) {
+        console.error("❌ Erro ao salvar:", error);
+        alert("Erro ao salvar: " + error.message);
+      }
+    }
+  </script>
+
+</body>
+</html>
