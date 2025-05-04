@@ -6,6 +6,18 @@
   <title>Criar Documento</title>
   <link rel="stylesheet" href="style.css">
 
+  <!-- Painel de controle de áudio do clinbot-->
+  <div class="center" id="clinbot-panel">
+    <button id="record-btn">🔴 Gravar áudio</button>
+    <button id="stop-btn" disabled>⏹ Parar</button>
+    <select id="lang">
+      <option value="pt">Português (pt-BR)</option>
+      <option value="en">English</option>
+    </select>
+    <button id="transcribe-btn" disabled>📝 Transcrever</button>
+    <span id="transcribe-status"></span>
+  </div>  
+
   <!-- TinyMCE via CDN MIT (sem API key) -->
   <script src="https://cdn.jsdelivr.net/npm/tinymce@6.8.3/tinymce.min.js"></script>
 

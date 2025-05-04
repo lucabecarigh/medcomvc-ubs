@@ -9,7 +9,8 @@ import {
 import {
   getStorage,
   ref,
-  uploadBytes
+  uploadBytes,
+  getDownloadURL
 } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-storage.js";
 
 // Firebase config personalizado
@@ -159,3 +160,101 @@ window.abrirProntuario = abrirProntuario;
 window.abrirTratamento = abrirTratamento;
 window.uploadArquivo = uploadArquivo;
 window.fecharUpload = fecharUpload;
+
+// ─── ClinBot Copilot Integration ───────────────────────────────────────────────
+
+// your backend URLs
+const TRANSCRIBE_URL = 'http://127.0.0.1:8000/transcribe/';
+const SOAP_URL       = 'http://127.0.0.1:8000/summarize/';
+
+document.addEventListener('DOMContentLoaded', () => {
+  // grab the controls you added in criar_doc.html
+  const recordBtn     = document.getElementById('record-btn');
+  const stopBtn       = document.getElementById('stop-btn');
+  const transcribeBtn = document.getElementById('transcribe-btn');
+  const statusSpan    = document.getElementById('transcribe-status');
+  const soapBtn       = document.getElementById('soap-btn');
+  const soapStatus    = document.getElementById('soap-status');
+
+  let mediaRecorder, audioChunks = [];
+
+  // 1) Start recording
+  recordBtn.addEventListener('click', async () => {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    mediaRecorder = new MediaRecorder(stream);
+    audioChunks = [];
+    mediaRecorder.ondataavailable = e => audioChunks.push(e.data);
+    mediaRecorder.start();
+    recordBtn.disabled = true;
+    stopBtn.disabled   = false;
+    statusSpan.textContent = 'Gravando…';
+  });
+
+  // 2) Stop recording
+  stopBtn.addEventListener('click', () => {
+    mediaRecorder.stop();
+    recordBtn.disabled     = false;
+    stopBtn.disabled       = true;
+    transcribeBtn.disabled = false;
+    statusSpan.textContent = 'Pronto para transcrever';
+  });
+
+  // 3) Send for transcription
+  transcribeBtn.addEventListener('click', async () => {
+    transcribeBtn.disabled = true;
+    statusSpan.textContent = 'Enviando para transcrever…';
+
+    const blob = new Blob(audioChunks, { type: 'audio/wav' });
+    const form = new FormData();
+    form.append('file', blob, 'recording.wav');
+
+    try {
+      const res = await fetch(TRANSCRIBE_URL, { method: 'POST', body: form });
+      const { transcript } = await res.json();
+      // inject into TinyMCE
+      tinymce.get('editor').setContent(
+        `<p>${transcript.replace(/\n/g,'<br>')}</p>`
+      );
+      statusSpan.textContent = 'Transcrição concluída';
+    } catch (err) {
+      console.error(err);
+      statusSpan.textContent = 'Erro na transcrição';
+    }
+  });
+
+  // 4) Generate SOAP from current content
+  soapBtn.addEventListener('click', async () => {
+    const transcript = tinymce.get('editor')
+      .getContent({ format: 'text' })
+      .trim();
+    if (!transcript) {
+      alert('Nada para gerar SOAP.');
+      return;
+    }
+
+    soapBtn.disabled = true;
+    soapStatus.textContent = 'Gerando nota SOAP…';
+
+    try {
+      const res = await fetch(SOAP_URL, {
+        method: 'POST',
+        headers: { 'Content-Type':'application/json' },
+        body: JSON.stringify({ transcript })
+      });
+      const { soap } = await res.json();
+      // soap vem como string JSON, parseia
+      const obj = JSON.parse(soap);
+      const html = `
+        <h2>Subjectivo</h2><p>${obj.S}</p>
+        <h2>Objetivo</h2><p>${obj.O}</p>
+        <h2>Avaliação</h2><p>${obj.A}</p>
+        <h2>Plano</h2><p>${obj.P}</p>
+      `;
+      tinymce.get('editor').setContent(html);
+      soapStatus.textContent = 'Nota SOAP inserida';
+    } catch (err) {
+      console.error(err);
+      soapStatus.textContent = 'Erro ao gerar SOAP';
+    }
+  });
+});
