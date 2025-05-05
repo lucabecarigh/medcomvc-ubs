@@ -248,7 +248,7 @@ window.voltar = () => {
   window.location.href = "paciente_view.html";
 };
 
-// 9) ClinBot audio → transcript → SOAP
+// ─── ClinBot audio → transcription → SOAP ────────────────────────────────────
 const TRANSCRIBE_URL = 'http://127.0.0.1:8000/transcribe/';
 const SOAP_URL       = 'http://127.0.0.1:8000/summarize/';
 
@@ -262,6 +262,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   let mediaRecorder, audioChunks = [];
 
+  // 1) Start recording
   recordBtn.addEventListener('click', async () => {
     const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
     mediaRecorder = new MediaRecorder(stream);
@@ -273,6 +274,7 @@ document.addEventListener('DOMContentLoaded', () => {
     statusSpan.textContent = 'Gravando…';
   });
 
+  // 2) Stop recording
   stopBtn.addEventListener('click', () => {
     mediaRecorder.stop();
     recordBtn.disabled     = false;
@@ -281,37 +283,80 @@ document.addEventListener('DOMContentLoaded', () => {
     statusSpan.textContent = 'Pronto para transcrever';
   });
 
+  // 3) Send for transcription
   transcribeBtn.addEventListener('click', async () => {
     transcribeBtn.disabled = true;
     statusSpan.textContent = 'Enviando para transcrever…';
 
     const blob = new Blob(audioChunks, { type: 'audio/wav' });
-        const form = new FormData();
-        form.append('file', blob);
-    
-        try {
-          const response = await fetch(TRANSCRIBE_URL, { method: 'POST', body: form });
-          const result = await response.json();
-          statusSpan.textContent = 'Transcrição concluída!';
-          console.log('Transcrição:', result);
-        } catch (err) {
-          console.error('Erro ao transcrever:', err);
-          statusSpan.textContent = 'Erro ao transcrever.';
-        }
-      });
-    
-      soapBtn.addEventListener('click', async () => {
-        soapBtn.disabled = true;
-        soapStatus.textContent = 'Enviando para SOAP…';
-    
-        try {
-          const response = await fetch(SOAP_URL, { method: 'POST', body: JSON.stringify({ text: 'Transcrição aqui' }) });
-          const result = await response.json();
-          soapStatus.textContent = 'SOAP concluído!';
-          console.log('SOAP:', result);
-        } catch (err) {
-          console.error('Erro ao gerar SOAP:', err);
-          soapStatus.textContent = 'Erro ao gerar SOAP.';
-        }
-      });
-    });
+    const form = new FormData();
+    form.append('file', blob, 'recording.wav');
+
+    try {
+      const res    = await fetch(TRANSCRIBE_URL, { method: 'POST', body: form });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const { transcript } = await res.json();
+
+      // inject the raw transcript into TinyMCE
+      tinymce.get('editor').setContent(
+        `<p>${transcript.replace(/\n/g, '<br>')}</p>`
+      );
+      statusSpan.textContent = 'Transcrição concluída!';
+      soapBtn.disabled = false;             // enable SOAP button now that we have text
+    } catch (err) {
+      console.error('Erro ao transcrever:', err);
+      statusSpan.textContent = 'Erro ao transcrever.';
+    }
+  });
+
+    // 4) Generate SOAP from current editor content
+    soapBtn.addEventListener('click', async () => {
+      const transcript = tinymce
+        .get('editor')
+        .getContent({ format: 'text' })
+        .trim();
+  
+      if (!transcript) {
+        alert('Nada para gerar SOAP.');
+        return;
+      }
+  
+      soapBtn.disabled        = true;
+      soapStatus.textContent  = 'Enviando para SOAP…';
+  
+      try {
+        const res = await fetch(SOAP_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ transcript })   // <-- must match SummarizeRequest.transcript
+        });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  
+        const { soap } = await res.json();
+  
+        // ─── Strip Markdown fences (```json ... ```) ──────────────────────────────────
+        const cleaned = soap
+          .replace(/```json\s*/g, '')    // remove leading ```json
+          .replace(/```/g, '')           // remove trailing ```
+          .trim();
+  
+        const obj = JSON.parse(cleaned);
+  
+        // ─── Build the HTML fragment ────────────────────────────────────────────────
+        const html = `
+          <h2>Subjectivo</h2><p>${obj.S || ''}</p>
+          <h2>Objetivo</h2><p>${obj.O || ''}</p>
+          <h2>Avaliação</h2><p>${obj.A || ''}</p>
+          <h2>Plano</h2><p>${obj.P || ''}</p>
+        `;
+  
+        tinymce.get('editor').setContent(html);
+        soapStatus.textContent = 'SOAP concluído!';
+      } catch (err) {
+        console.error('Erro ao gerar SOAP:', err);
+        soapStatus.textContent = 'Erro ao gerar SOAP.';
+        soapBtn.disabled = false;
+      }
+    });  
+});
+
