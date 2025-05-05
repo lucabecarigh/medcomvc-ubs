@@ -4,32 +4,29 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Criar Documento</title>
-  <link rel="stylesheet" href="style.css">
+
+  <!-- TinyMCE -->
   <script src="https://cdn.jsdelivr.net/npm/tinymce@6.8.3/tinymce.min.js"></script>
+
+  <!-- Estilos -->
+  <link rel="stylesheet" href="style.css">
   <style>
-    body {
-      background: #f2f6f8;
-      padding: 20px;
-      font-family: sans-serif;
-    }
-    h1 {
-      text-align: center;
-    }
-    #editor-container {
-      max-width: 1000px;
-      margin: auto;
-    }
-    textarea#editor {
-      min-height: 500px;
-    }
-    .center {
-      text-align: center;
-      margin-bottom: 20px;
-    }
-    select, button {
-      margin: 5px;
-      padding: 8px 15px;
-    }
+    body             { background:#f2f6f8; padding:20px; font-family:sans-serif; }
+    h1               { text-align:center; }
+    #editor-container{ max-width:1000px; margin:auto; }
+    textarea#editor  { min-height:500px; }
+
+    .center          { text-align:center; margin-bottom:20px; }
+    select,button    { margin:5px; padding:8px 15px; }
+
+    /* Chat Clinbot */
+    #clinbotChat     { max-width:1000px; margin:20px auto 0; background:#fff;
+                       border:1px solid #ccc; border-radius:8px; padding:15px;
+                       white-space:pre-wrap; }
+    #clinbotChat .user      { color:#0d6efd; font-weight:600; }
+    #clinbotChat .assistant { color:#198754; }
+    #clinbotQuestion { width:100%; max-width:1000px; height:80px; margin:10px auto;
+                       display:block; padding:10px; }
   </style>
 </head>
 <body>
@@ -51,7 +48,7 @@
       <option value="primeira_adulto">1ª Consulta Adulto</option>
       <option value="primeira_pediatria">1ª Consulta Pediatria</option>
       <option value="puericultura">Puericultura</option>
-      <option value="pre_natal">Pré-natal</option>
+      <option value="pre_natal">Pré‑natal</option>
       <option value="rotina_adulto">Rotina Adulto</option>
       <option value="rotina_pediatria">Rotina Pediatria</option>
       <option value="demanda_espontanea">Demanda Espontânea</option>
@@ -64,32 +61,74 @@
 
   <div class="center">
     <button onclick="salvarDocumento()">💾 Salvar</button>
+    <button onclick="clinbotPrimeiraAnalise()">🤖 Clinbot</button>
     <button onclick="voltar()">🔙 Voltar</button>
   </div>
 
+  <!-- Área de chat / respostas -->
+  <div id="clinbotChat" hidden></div>
+  <textarea id="clinbotQuestion" placeholder="Pergunte algo ao Clinbot..." hidden></textarea>
+  <div class="center"><button id="clinbotAskBtn" onclick="clinbotPerguntar()" hidden>Enviar pergunta</button></div>
+
+  <!-- Gerador de PDF -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 
+  <!-- Firebase + OpenAI -->
   <script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
-    import { getFirestore, doc, getDoc, updateDoc } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
-    import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-storage.js";
+    /* ---------- Firebase ---------- */
+    import { initializeApp }                          from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
+    import { getFirestore, doc, getDoc, updateDoc }   from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
+    import { getStorage, ref, uploadBytes, getDownloadURL }
+                                                     from "https://www.gstatic.com/firebasejs/10.8.1/firebase-storage.js";
 
     const firebaseConfig = {
-      apiKey: "AIzaSyAmF5FS_ekWW_7-1RUHtGCR71LH6r9fg08",
-      authDomain: "medcomvc-ubs.firebaseapp.com",
-      projectId: "medcomvc-ubs",
-      storageBucket: "medcomvc-ubs.firebasestorage.app",
+      apiKey:            "AIzaSyAmF5FS_ekWW_7-1RUHtGCR71LH6r9fg08",
+      authDomain:        "medcomvc-ubs.firebaseapp.com",
+      projectId:         "medcomvc-ubs",
+      storageBucket:     "medcomvc-ubs.firebasestorage.app",
       messagingSenderId: "313420248004",
-      appId: "1:313420248004:web:a9a28d97b3ef2e33c36a91"
+      appId:             "1:313420248004:web:a9a28d97b3ef2e33c36a91"
     };
 
-    const app = initializeApp(firebaseConfig);
-    const db = getFirestore(app);
+    const app     = initializeApp(firebaseConfig);
+    const db      = getFirestore(app);
     const storage = getStorage(app, "gs://medcomvc-ubs.firebasestorage.app");
 
+    /* ---------- Variáveis globais ---------- */
     const pacienteId = localStorage.getItem("pacienteSelecionado");
-    const medicoId = localStorage.getItem("uid");
+    const medicoId   = localStorage.getItem("uid");
 
+    /* ---------- OpenAI ---------- */
+    let OPENAI_API_KEY = localStorage.getItem("openaiApiKey") || "";
+
+    function pedirApiKey() {
+      if (OPENAI_API_KEY) return true;
+      const k = prompt("Digite sua OpenAI API Key (fica salva apenas neste navegador):");
+      if (!k) return false;
+      OPENAI_API_KEY = k.trim();
+      localStorage.setItem("openaiApiKey", OPENAI_API_KEY);
+      return true;
+    }
+
+    /* ---------- Prompt base ---------- */
+    const systemPrompt = `Você é um médico assistente inteligente. Avalie cuidadosamente a consulta abaixo e atue como apoio clínico.
+
+1. Leia o conteúdo da consulta e faça uma análise detalhada. 
+2. Para qualquer outra comorbidade que identificar, use seu conhecimento médico e as boas práticas de atenção primária.
+3. Avalie o que **falta** na anamnese, revisão de sistemas, exame físico ou plano.
+4. Proponha **hipóteses diagnósticas prováveis**.
+5. Sugira **exames complementares** relevantes e uma possível **conduta/resumo do plano clínico**.
+6. Comente se há **rastreios pendentes, atualizações de vacina, necessidade de retorno ou referência**.
+7. Escreva de forma empática e direta, como um colega médico experiente que está ajudando na consulta.
+8. Baseie‑se sempre nas melhores práticas médicas e evidências confiáveis.
+9. Busque se possível na web atualizações além do seu conhecimento prévio.
+10. Lembre‑se de scores úteis para o paciente.
+11. Sempre cite as fontes das informações.`;
+
+    /* ---------- Histórico de conversa ---------- */
+    const conversation = []; // {role:"user"/"assistant", content:"..."}
+
+    /* ---------- TinyMCE ---------- */
     tinymce.init({
       selector: '#editor',
       height: 500,
@@ -100,9 +139,9 @@
       automatic_uploads: true,
       images_upload_handler: async function (blobInfo, success, failure) {
         try {
-          const file = blobInfo.blob();
+          const file     = blobInfo.blob();
           const filename = `imagem_${Date.now()}.jpg`;
-          const caminho = `pacientes/${pacienteId}/imagens/${filename}`;
+          const caminho  = `pacientes/${pacienteId}/imagens/${filename}`;
           const storageRef = ref(storage, caminho);
           await uploadBytes(storageRef, file);
           const url = await getDownloadURL(storageRef);
@@ -116,16 +155,16 @@
       file_picker_callback: function (callback, value, meta) {
         if (meta.filetype === 'image') {
           const input = document.createElement('input');
-          input.setAttribute('type', 'file');
-          input.setAttribute('accept', 'image/*');
+          input.type = 'file';
+          input.accept = 'image/*';
           input.onchange = function () {
-            const file = this.files[0];
+            const file   = this.files[0];
             const reader = new FileReader();
             reader.onload = function () {
-              const id = 'blobid' + (new Date()).getTime();
+              const id        = 'blobid' + Date.now();
               const blobCache = tinymce.activeEditor.editorUpload.blobCache;
-              const base64 = reader.result.split(',')[1];
-              const blobInfo = blobCache.create(id, file, base64);
+              const base64    = reader.result.split(',')[1];
+              const blobInfo  = blobCache.create(id, file, base64);
               blobCache.add(blobInfo);
               callback(blobInfo.blobUri(), { title: file.name });
             };
@@ -134,32 +173,29 @@
           input.click();
         }
       },
-      content_style: `body { font-family: Helvetica, Arial, sans-serif; font-size: 14px; padding: 20px; } img { max-width: 100%; height: auto; }`
+      content_style:`body{font-family:Helvetica,Arial,sans-serif;font-size:14px;padding:20px;}img{max-width:100%;height:auto;}`
     });
 
-    // 🔹 Carregar modelo de template ao mudar o select
+    /* ---------- Carregar template ---------- */
     document.getElementById("template").addEventListener("change", async function () {
       const modelo = this.value;
       if (!modelo) return;
-
       try {
-        const refDoc = doc(db, "templates", modelo);
-        const snap = await getDoc(refDoc);
+        const docRef = doc(db, "templates", modelo);
+        const snap   = await getDoc(docRef);
         if (!snap.exists()) throw new Error("Modelo não encontrado.");
-
-        const textoHTML = snap.data().v1 || "";
-        tinymce.get("editor").setContent(textoHTML);
-      } catch (error) {
-        console.error("Erro ao carregar modelo:", error);
+        tinymce.get("editor").setContent(snap.data().v1 || "");
+      } catch (e) {
+        console.error(e);
         alert("Erro ao carregar o modelo.");
       }
     });
 
-    // 🔹 Salvar documento
+    /* ---------- Salvar documento (PDF + redirecionar) ---------- */
     window.salvarDocumento = async function () {
-      const tipo = document.getElementById("tipo").value;
+      const tipo        = document.getElementById("tipo").value;
       const htmlContent = tinymce.get("editor").getContent().trim();
-      const plainText = tinymce.get("editor").getContent({ format: "text" }).replace(/\s+/g, " ").trim();
+      const plainText   = tinymce.get("editor").getContent({ format:"text" }).replace(/\s+/g," ").trim();
 
       if (!pacienteId || !tipo || !htmlContent || !medicoId) {
         alert("Preencha o conteúdo e escolha uma pasta.");
@@ -167,47 +203,142 @@
       }
 
       try {
-        const refDoc = doc(db, "pacientes", pacienteId);
-        const snap = await getDoc(refDoc);
+        const docRef = doc(db,"pacientes",pacienteId);
+        const snap   = await getDoc(docRef);
         if (!snap.exists()) throw new Error("Paciente não encontrado.");
 
-        const dados = snap.data();
-        const arrayAtual = Array.isArray(dados[tipo]) ? dados[tipo] : [];
+        const dados       = snap.data();
+        const arrayAtual  = Array.isArray(dados[tipo]) ? dados[tipo] : [];
         arrayAtual.push(plainText);
-        await updateDoc(refDoc, { [tipo]: arrayAtual });
+        await updateDoc(docRef,{ [tipo]: arrayAtual });
 
-        const agora = new Date();
-        const data = agora.toLocaleDateString("pt-BR").replace(/\//g, "-");
-        const hora = agora.toTimeString().slice(0, 5).replace(":", "-");
+        /* PDF */
+        const agora   = new Date();
+        const data    = agora.toLocaleDateString("pt-BR").replace(/\//g,"-");
+        const hora    = agora.toTimeString().slice(0,5).replace(":","-");
         const nomePDF = `${pacienteId}_${tipo}_${data}_${hora}_${medicoId}.pdf`;
 
-        const elementoPDF = document.createElement("div");
-        elementoPDF.innerHTML = `<h1>Documento (${tipo})</h1>${htmlContent}`;
+        const wrapper = document.createElement("div");
+        wrapper.innerHTML = `<h1>Documento (${tipo})</h1>${htmlContent}`;
 
-        const opt = {
-          margin: 1,
-          filename: nomePDF,
-          image: { type: "jpeg", quality: 0.98 },
-          html2canvas: { scale: 2 },
-          jsPDF: { unit: "in", format: "a4", orientation: "portrait" }
-        };
+        const pdfBlob = await html2pdf().from(wrapper).set({
+          margin:1,
+          filename:nomePDF,
+          image:{ type:"jpeg",quality:0.98 },
+          html2canvas:{ scale:2 },
+          jsPDF:{ unit:"in", format:"a4", orientation:"portrait" }
+        }).outputPdf("blob");
 
-        const pdfBlob = await html2pdf().from(elementoPDF).set(opt).outputPdf("blob");
-        const storageRef = ref(storage, `pacientes/${pacienteId}/${tipo}/${nomePDF}`);
+        const storageRef = ref(storage,`pacientes/${pacienteId}/${tipo}/${nomePDF}`);
         await uploadBytes(storageRef, pdfBlob);
 
         alert("Documento salvo com sucesso!");
         window.location.href = "paciente_view.html";
 
       } catch (error) {
-        console.error("Erro ao salvar documento:", error);
+        console.error(error);
         alert("Erro ao salvar.");
       }
     };
 
-    window.voltar = function () {
-      window.location.href = "paciente_view.html";
+    /* ---------- Primeira análise do Clinbot ---------- */
+    window.clinbotPrimeiraAnalise = async function () {
+      const tipo        = document.getElementById("tipo").value;
+      const htmlContent = tinymce.get("editor").getContent().trim();
+      const plainText   = tinymce.get("editor").getContent({ format:"text" }).replace(/\s+/g," ").trim();
+
+      if (!pacienteId || !tipo || !htmlContent || !medicoId) {
+        alert("Preencha o conteúdo e escolha uma pasta.");
+        return;
+      }
+
+      /* Salvar TXT no Firestore (sem sair) */
+      try {
+        const docRef = doc(db,"pacientes",pacienteId);
+        const snap   = await getDoc(docRef);
+        if (!snap.exists()) throw new Error("Paciente não encontrado.");
+        const dados       = snap.data();
+        const arrayAtual  = Array.isArray(dados[tipo]) ? dados[tipo] : [];
+        arrayAtual.push(plainText);
+        await updateDoc(docRef, { [tipo]: arrayAtual });
+      } catch (e) {
+        console.error("Erro ao salvar texto:", e);
+        alert("Erro ao salvar texto antes do Clinbot.");
+        return;
+      }
+
+      /* API Key */
+      if (!pedirApiKey()) return;
+
+      /* Monta mensagens */
+      conversation.length = 0; // zera caso médico clique novamente
+      conversation.push({ role:"user", content: plainText });
+
+      await chamarOpenAI(); // faz chamada e exibe chat
+      /* Após retorno, exibe área de pergunta */
+      document.getElementById("clinbotQuestion").hidden = false;
+      document.getElementById("clinbotAskBtn").hidden   = false;
     };
+
+    /* ---------- Perguntar depois ---------- */
+    window.clinbotPerguntar = async function () {
+      const perguntaEl = document.getElementById("clinbotQuestion");
+      const pergunta   = perguntaEl.value.trim();
+      if (!pergunta) return;
+      conversaLog("user", pergunta);
+      conversation.push({ role:"user", content: pergunta });
+      perguntaEl.value = "";
+      await chamarOpenAI();
+    };
+
+    /* ---------- Função comum para chamar a OpenAI ---------- */
+    async function chamarOpenAI() {
+      const chatDiv = document.getElementById("clinbotChat");
+      chatDiv.hidden = false;
+      conversaLog("assistant", "⏳ Pensando...");
+
+      try {
+        const resposta = await fetch("https://api.openai.com/v1/chat/completions", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${OPENAI_API_KEY}`
+          },
+          body: JSON.stringify({
+            model: "gpt-3.5-turbo",
+            messages: [
+              { role:"system", content: systemPrompt },
+              ...conversation
+            ],
+            temperature: 0.7
+          })
+        });
+
+        const data = await resposta.json();
+        if (data.error) throw new Error(data.error.message || "Erro da API");
+
+        /* Atualiza último "Pensando..." */
+        chatDiv.lastChild.textContent = `🤖 ${data.choices[0].message.content.trim()}`;
+        conversation.push({ role:"assistant", content: data.choices[0].message.content.trim() });
+
+      } catch (e) {
+        console.error("Erro no Clinbot:", e);
+        chatDiv.lastChild.textContent = "❌ Erro ao obter resposta do Clinbot.";
+      }
+    }
+
+    /* ---------- Helper para exibir conversa ---------- */
+    function conversaLog(role, texto) {
+      const chatDiv = document.getElementById("clinbotChat");
+      const msg     = document.createElement("div");
+      msg.className = role === "user" ? "user" : "assistant";
+      msg.textContent = role === "user" ? `👨‍⚕️ ${texto}` : `🤖 ${texto}`;
+      chatDiv.appendChild(msg);
+      chatDiv.scrollTop = chatDiv.scrollHeight;
+    }
+
+    /* ---------- Voltar ---------- */
+    window.voltar = () => window.location.href = "paciente_view.html";
   </script>
 </body>
 </html>
