@@ -5,6 +5,16 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Área do Médico</title>
   <link rel="stylesheet" href="style.css" />
+
+  <style>
+    /* estilos rápidos pro modal */
+    .modal          { position:fixed; top:0; left:0; width:100%; height:100%;
+                      background:rgba(0,0,0,.6); display:none; align-items:center; justify-content:center; }
+    .modal-content  { background:#fff; padding:20px; border-radius:8px; width:90%; max-width:400px; }
+    .modal-content input{ width:100%; padding:8px; margin:6px 0; }
+    .btn-consultas  { margin:6px 3px; padding:10px 15px; }
+    .pasta          { background:#e9ecef; padding:8px 12px; margin:4px 0; cursor:pointer; border-radius:6px;}
+  </style>
 </head>
 <body>
   <h1>👨‍⚕️ Meus Pacientes</h1>
@@ -16,106 +26,143 @@
   <button class="btn-consultas" onclick="abrirCalendario()">📅 Ver todas as consultas</button>
   <button class="btn-consultas" onclick="abrirModalNovoPaciente()">➕ Adicionar novo paciente</button>
   
-  <div id="modalNovoPaciente" class="modal" style="display:none;">
+  <!-- Modal Novo Paciente -->
+  <div id="modalNovoPaciente" class="modal">
     <div class="modal-content">
       <h2>Novo Paciente</h2>
-      <input type="text" id="novo-nome" placeholder="Nome" />
-      <input type="text" id="novo-sobrenome" placeholder="Sobrenome" />
-      <input type="number" id="novo-idade" placeholder="Idade" />
-      <input type="text" id="novo-cidade" placeholder="Cidade" />
-      <input type="text" id="novo-estado" placeholder="Estado" />
+      <input type="text"   id="novo-nome"        placeholder="Nome"          />
+      <input type="text"   id="novo-sobrenome"   placeholder="Sobrenome"     />
+      <input type="email"  id="novo-email"       placeholder="E‑mail"        />
+      <input type="date"   id="novo-nascimento"  placeholder="Data de nasc." />
+      <input type="tel"    id="novo-telefone"    placeholder="Telefone"      />
+      <input type="text"   id="novo-endereco"    placeholder="Endereço"      />
+
       <button onclick="salvarNovoPaciente()">Salvar</button>
       <button onclick="fecharModalNovoPaciente()">Cancelar</button>
     </div>
   </div>
 
   <script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
-    import { getFirestore, doc, getDoc } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
+    /* ---------- Firebase imports ---------- */
+    import { initializeApp }                        from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
+    import { getAuth, createUserWithEmailAndPassword }
+                                                   from "https://www.gstatic.com/firebasejs/10.8.1/firebase-auth.js";
+    import { getFirestore, doc, getDoc, setDoc,
+             updateDoc, arrayUnion }               from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
 
+    /* ---------- Config ---------- */
     const firebaseConfig = {
-      apiKey: "AIzaSyAmF5FS_ekWW_7-1RUHtGCR71LH6r9fg08",
-      authDomain: "medcomvc-ubs.firebaseapp.com",
-      projectId: "medcomvc-ubs",
-      storageBucket: "medcomvc-ubs.appspot.com",
+      apiKey:            "AIzaSyAmF5FS_ekWW_7-1RUHtGCR71LH6r9fg08",
+      authDomain:        "medcomvc-ubs.firebaseapp.com",
+      projectId:         "medcomvc-ubs",
+      storageBucket:     "medcomvc-ubs.firebasestorage.app",
       messagingSenderId: "313420248004",
-      appId: "1:313420248004:web:a9a28d97b3ef2e33c36a91"
+      appId:             "1:313420248004:web:a9a28d97b3ef2e33c36a91"
     };
 
-    const app = initializeApp(firebaseConfig);
-    const db = getFirestore(app);
+    const app  = initializeApp(firebaseConfig);
+    const db   = getFirestore(app);
+    const auth = getAuth(app);
 
+    /* ---------- Listar pacientes do médico ---------- */
     async function listarPacientes() {
       const container = document.getElementById('lista-pacientes');
       container.innerHTML = "<p>Carregando pacientes...</p>";
 
       const uidMedico = localStorage.getItem("uid");
-      if (!uidMedico) {
-        container.innerHTML = "<p>Erro: médico não identificado.</p>";
-        return;
-      }
+      if (!uidMedico) { container.innerHTML = "<p>Erro: médico não identificado.</p>"; return; }
 
       try {
-        const medicoRef = doc(db, "medicos", uidMedico);
-        const medicoSnap = await getDoc(medicoRef);
+        const medicoSnap = await getDoc(doc(db,"medicos",uidMedico));
+        if (!medicoSnap.exists()) { container.innerHTML = "<p>Médico não encontrado.</p>"; return; }
 
-        if (!medicoSnap.exists()) {
-          container.innerHTML = "<p>Médico não encontrado no Firestore.</p>";
-          return;
-        }
-
-        const dadosMedico = medicoSnap.data();
-        const meuspacientes = dadosMedico.meuspacientes || [];
-
-        if (meuspacientes.length === 0) {
-          container.innerHTML = "<p>Você ainda não tem pacientes vinculados.</p>";
-          return;
-        }
+        const meuspacientes = medicoSnap.data().meuspacientes || [];
+        if (meuspacientes.length===0){ container.innerHTML="<p>Você ainda não tem pacientes.</p>"; return; }
 
         container.innerHTML = "";
-
-        for (const uidPaciente of meuspacientes) {
-          const pacienteRef = doc(db, "pacientes", uidPaciente);
-          const pacienteSnap = await getDoc(pacienteRef);
-
-          if (pacienteSnap.exists()) {
-            const dadosPaciente = pacienteSnap.data();
-            const identificacao = dadosPaciente.identificacao?.[0] || {};
-            const nome = identificacao.nome || "Paciente";
-            const sobrenome = identificacao.sobrenome || "";
-            const idade = identificacao.idade || "";
-
-            const div = document.createElement("div");
-            div.classList.add("pasta");
-            div.innerText = `${nome} ${sobrenome} (${idade} anos)`;
-            div.onclick = () => {
-              localStorage.setItem("pacienteSelecionado", uidPaciente);
-              window.location.href = "paciente_view.html";
-            };
-            container.appendChild(div);
-          }
+        for (const uidP of meuspacientes) {
+          const snapPac = await getDoc(doc(db,"pacientes",uidP));
+          if (!snapPac.exists()) continue;
+          const id = snapPac.data().identificacao?.[0] || {};
+          const div = document.createElement("div");
+          div.className="pasta";
+          div.textContent = `${id.nome||"Paciente"} ${id.sobrenome||""} (${id.idade||"--"} anos)`;
+          div.onclick = () => { localStorage.setItem("pacienteSelecionado",uidP); window.location.href="paciente_view.html"; };
+          container.appendChild(div);
         }
-      } catch (error) {
-        console.error("Erro ao carregar pacientes:", error);
-        container.innerHTML = "<p>Erro ao carregar pacientes.</p>";
+      } catch (e) {
+        console.error(e); container.innerHTML="<p>Erro ao carregar pacientes.</p>";
       }
     }
 
-    function abrirCalendario() {
-      alert("Exibir calendário com todas as consultas.");
+    /* ---------- Modal controls ---------- */
+    function abrirCalendario(){ alert("Calendário completo (a implementar)."); }
+    function abrirModalNovoPaciente(){ document.getElementById("modalNovoPaciente").style.display="flex"; }
+    function fecharModalNovoPaciente(){ document.getElementById("modalNovoPaciente").style.display="none"; }
+
+    /* ---------- Salvar novo paciente ---------- */
+    async function salvarNovoPaciente(){
+      /* Coleta dados */
+      const nome       = document.getElementById("novo-nome").value.trim();
+      const sobrenome  = document.getElementById("novo-sobrenome").value.trim();
+      const email      = document.getElementById("novo-email").value.trim();
+      const nasc       = document.getElementById("novo-nascimento").value;
+      const telefone   = document.getElementById("novo-telefone").value.trim();
+      const endereco   = document.getElementById("novo-endereco").value.trim();
+
+      if (!nome||!sobrenome||!email||!nasc||!telefone||!endereco){
+        alert("Preencha todos os campos."); return;
+      }
+
+      const uidMedico = localStorage.getItem("uid");
+      if (!uidMedico){ alert("Erro: médico não logado."); return; }
+
+      try{
+        /* 1. cria Auth */
+        const senhaPadrao = "123456";
+        const cred        = await createUserWithEmailAndPassword(auth,email,senhaPadrao);
+        const uidPac      = cred.user.uid;
+
+        /* 2. cria documento do paciente */
+        const docPaciente = {
+          criadoEm: new Date().toISOString(),
+          calendario: [],
+          documento : [],
+          exame     : [],
+          identificacao: [{
+            nome, sobrenome,
+            email,
+            data_nascimento: nasc,
+            telefone,
+            endereco
+          }],
+          meusmedicos: [uidMedico],
+          prontuario : [],
+          resumo     : [],
+          tratamento : []
+        };
+        await setDoc(doc(db,"pacientes",uidPac), docPaciente);
+
+        /* 3. atualiza médico */
+        await updateDoc(doc(db,"medicos",uidMedico),{
+          meuspacientes: arrayUnion(uidPac)
+        });
+
+        alert(`Paciente criado! UID: ${uidPac}\nSenha provisória: ${senhaPadrao}`);
+        fecharModalNovoPaciente();
+        listarPacientes();
+
+      }catch(e){
+        console.error(e);
+        alert("Erro ao criar paciente: "+(e.message||e));
+      }
     }
 
-    function abrirModalNovoPaciente() {
-      document.getElementById("modalNovoPaciente").style.display = "flex";
-    }
-
-    function fecharModalNovoPaciente() {
-      document.getElementById("modalNovoPaciente").style.display = "none";
-    }
-
-    window.abrirCalendario = abrirCalendario;
-    window.abrirModalNovoPaciente = abrirModalNovoPaciente;
-    window.fecharModalNovoPaciente = fecharModalNovoPaciente;
+    /* ---------- Exposição no global (para onclick) ---------- */
+    window.abrirCalendario            = abrirCalendario;
+    window.abrirModalNovoPaciente     = abrirModalNovoPaciente;
+    window.fecharModalNovoPaciente    = fecharModalNovoPaciente;
+    window.salvarNovoPaciente         = salvarNovoPaciente;
 
     listarPacientes();
   </script>
