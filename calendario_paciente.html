@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Minhas Consultas</title>
+
+  <!-- FullCalendar -->
+  <link href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.css" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.js"></script>
+
+  <style>
+    body      { font-family:sans-serif; margin:0; }
+    #calendar { max-width:900px; margin:20px auto; }
+
+    /* Modal de detalhes (só leitura) */
+    .modal        { position:fixed; inset:0; background:rgba(0,0,0,.6);
+                    display:none; align-items:center; justify-content:center; z-index:10000; }
+    .modal.open   { display:flex; }
+    .modal-box    { background:#fff; padding:25px; border-radius:8px; width:90%; max-width:400px;
+                    box-shadow:0 2px 10px rgba(0,0,0,.35); }
+    .modal-box h2 { margin-top:0; }
+    .modal-box button{ margin-top:12px; padding:8px 14px; }
+  </style>
+</head>
+<body>
+  <h1 style="text-align:center;margin-top:15px;">🗓️ Minhas Consultas</h1>
+  <div id="calendar"></div>
+
+  <!-- Modal detalhes -->
+  <div id="modalDetalhe" class="modal">
+    <div class="modal-box">
+      <h2>Detalhes da Consulta</h2>
+      <div id="detalheTexto"></div>
+      <button id="btnClose">Fechar</button>
+    </div>
+  </div>
+
+  <script type="module">
+    import { initializeApp }         from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
+    import { getFirestore, doc, getDoc }
+                                    from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
+
+    /* --- Firebase --- */
+    const firebaseConfig = {
+      apiKey: "AIzaSyAmF5FS_ekWW_7-1RUHtGCR71LH6r9fg08",
+      authDomain: "medcomvc-ubs.firebaseapp.com",
+      projectId: "medcomvc-ubs",
+      storageBucket: "medcomvc-ubs.firebasestorage.app",
+      messagingSenderId: "313420248004",
+      appId: "1:313420248004:web:a9a28d97b3ef2e33c36a91"
+    };
+    const app = initializeApp(firebaseConfig);
+    const db  = getFirestore(app);
+
+    /* --- UID do paciente (salvo no login) --- */
+    const uidPaciente = localStorage.getItem("uid");
+    if (!uidPaciente){
+      alert("Sessão expirada. Faça login novamente.");
+      window.location.href = "index.html";
+    }
+
+    /* --- Carrega agenda --- */
+    let calendar;
+
+    document.addEventListener("DOMContentLoaded", async ()=>{
+      const pacSnap = await getDoc(doc(db,"pacientes",uidPaciente));
+      const eventos = (pacSnap.exists() ? pacSnap.data().calendario : []) || [];
+
+      const fcEvents = eventos.map(ev=>({
+        title: ev.titulo,
+        start: ev.dataHora,
+        extendedProps: ev
+      }));
+
+      calendar = new FullCalendar.Calendar(document.getElementById("calendar"),{
+        locale:"pt-br",
+        initialView:"dayGridMonth",
+        headerToolbar:{ left:"prev,next today", center:"title", right:"" },
+        events: fcEvents,
+        eventClick: info => abrirDetalhe(info.event)
+      });
+      calendar.render();
+    });
+
+    /* --- Modal de detalhes --- */
+    const modal   = document.getElementById("modalDetalhe");
+    const detalhe = document.getElementById("detalheTexto");
+    document.getElementById("btnClose").onclick = ()=> modal.classList.remove("open");
+
+    function abrirDetalhe(event){
+      const ev = event.extendedProps;
+      detalhe.innerHTML =
+       `<b>Título:</b> ${ev.titulo}<br>`+
+       `<b>Data/Hora:</b> ${new Date(ev.dataHora).toLocaleString("pt-BR")}<br>`+
+       `<b>Local:</b> ${ev.local || "—"}`;
+      modal.classList.add("open");
+    }
+  </script>
+</body>
+</html>

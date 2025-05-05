@@ -3,22 +3,90 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Prontuário Eletrônico</title>
+  <title>Área do Paciente</title>
+  <link rel="stylesheet" href="style.css" />
+  <style>
+    .pastas-container{
+      display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr));
+      gap:14px; margin:30px 0;
+    }
+    .pasta{
+      background:#f1f3f5; border-radius:8px; padding:18px; text-align:center;
+      font-size:18px; cursor:pointer; transition:background .2s;
+    }
+    .pasta:hover{ background:#e2e6ea; }
+    .btn-consultas{ margin-top:20px; padding:10px 16px; }
+  </style>
 </head>
 <body>
-    <h1>Bem-vindo ao seu Prontuário</h1>
-  
-    <div class="pastas-container">
-      <div class="pasta" onclick="abrirPasta('resumo')">📄 Resumo</div>
-      <div class="pasta" onclick="abrirPasta('prontuarios')">📒 Prontuários</div>
-      <div class="pasta" onclick="abrirPasta('exames')">🧪 Exames</div>
-      <div class="pasta" onclick="abrirPasta('tratamentos')">💊 Tratamentos</div>
-      <div class="pasta" onclick="abrirPasta('documentos')">📁 Documentos</div>
-    </div>
-  
-    <button class="btn-consultas" onclick="verConsultas()">📅 Ver próximas consultas</button>
-  
-    <script src="firebase-config.js"></script>
-    <script src="script.js"></script>
+  <h1>👤 Minha Área</h1>
+  <p id="infoPaciente">Carregando...</p>
+
+  <div class="pastas-container">
+    <div class="pasta" onclick="abrirPasta('resumo')">📄 Resumo</div>
+    <div class="pasta" onclick="abrirPasta('prontuario')">📒 Prontuários</div>
+    <div class="pasta" onclick="abrirPasta('exame')">🧪 Exames</div>
+    <div class="pasta" onclick="abrirPasta('tratamento')">💊 Tratamentos</div>
+    <div class="pasta" onclick="abrirPasta('documento')">📁 Documentos</div>
+  </div>
+
+  <button class="btn-consultas" onclick="abrirCalendario()">📅 Ver minhas consultas</button>
+
+  <script type="module">
+    import { initializeApp }                     from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
+    import { getFirestore, doc, getDoc }         from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
+
+    /* --- Firebase --- */
+    const firebaseConfig = {
+      apiKey: "AIzaSyAmF5FS_ekWW_7-1RUHtGCR71LH6r9fg08",
+      authDomain: "medcomvc-ubs.firebaseapp.com",
+      projectId: "medcomvc-ubs",
+      storageBucket: "medcomvc-ubs.firebasestorage.app",
+      messagingSenderId: "313420248004",
+      appId: "1:313420248004:web:a9a28d97b3ef2e33c36a91"
+    };
+    const app = initializeApp(firebaseConfig);
+    const db  = getFirestore(app);
+
+    /* --- Captura UID salvo no login --- */
+    const uidPaciente = localStorage.getItem("uid");
+
+    if (!uidPaciente) {
+      alert("Sessão expirada. Faça login novamente.");
+      window.location.href = "index.html";
+    } else {
+      /* Deixa disponível para as páginas de pasta já existentes */
+      localStorage.setItem("pacienteSelecionado", uidPaciente);
+      carregarIdentificacao();
+    }
+
+    async function carregarIdentificacao(){
+      const info = document.getElementById("infoPaciente");
+      try{
+        const snap = await getDoc(doc(db,"pacientes",uidPaciente));
+        if (!snap.exists()){ info.textContent = "Paciente não encontrado."; return; }
+        const id = snap.data().identificacao?.[0] || {};
+        info.textContent = `Bem‑vindo(a), ${id.nome || "Paciente"} ${id.sobrenome||""}`;
+      }catch(e){
+        console.error(e); info.textContent = "Erro ao carregar dados."; 
+      }
+    }
+
+    /* --- Navegação --- */
+    function abrirPasta(pasta){
+      /* pastaSelecionada já é usada nos HTMLs de pasta */
+      localStorage.setItem("pastaSelecionada", pasta);
+      window.location.href = `${pasta}.html`;
+    }
+
+    function abrirCalendario(){
+      /* Reaproveitamos o mesmo calendário usado pelo médico — você pode fazer uma versão só‑leitura se quiser */
+      window.location.href = "calendario_paciente.html";
+    }
+
+    /* expõe globais para onclick */
+    window.abrirPasta     = abrirPasta;
+    window.abrirCalendario= abrirCalendario;
+  </script>
 </body>
 </html>
