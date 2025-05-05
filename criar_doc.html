@@ -6,7 +6,38 @@
   <title>Criar Documento</title>
   <link rel="stylesheet" href="style.css">
 
-  <!-- Painel de controle de áudio do clinbot-->
+  <!-- TinyMCE via CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/tinymce@6.8.3/tinymce.min.js"></script>
+
+  <style>
+    body {
+      background: #f2f6f8;
+      padding: 20px;
+      font-family: sans-serif;
+    }
+    h1 {
+      text-align: center;
+    }
+    #editor-container {
+      max-width: 1000px;
+      margin: auto;
+    }
+    textarea#editor {
+      min-height: 500px;
+    }
+    button {
+      margin: 10px;
+      padding: 10px 20px;
+      cursor: pointer;
+    }
+    .center {
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ─── ClinBot Audio + SOAP Panel ──────────────────────────────────────── -->
   <div class="center" id="clinbot-panel">
     <button id="record-btn">🔴 Gravar áudio</button>
     <button id="stop-btn" disabled>⏹ Parar</button>
@@ -16,45 +47,13 @@
     </select>
     <button id="transcribe-btn" disabled>📝 Transcrever</button>
     <span id="transcribe-status"></span>
-  </div>  
+    <button id="soap-btn">🗂️ Gerar SOAP</button>
+    <span id="soap-status"></span>
+  </div>
 
-  <!-- TinyMCE via CDN MIT (sem API key) -->
-  <script src="https://cdn.jsdelivr.net/npm/tinymce@6.8.3/tinymce.min.js"></script>
-
-  <style>
-    body {
-      background: #f2f6f8;
-      padding: 20px;
-      font-family: sans-serif;
-    }
-
-    h1 {
-      text-align: center;
-    }
-
-    #editor-container {
-      max-width: 1000px;
-      margin: auto;
-    }
-
-    textarea#editor {
-      min-height: 500px;
-    }
-
-    button {
-      margin: 10px;
-      padding: 10px 20px;
-      cursor: pointer;
-    }
-
-    .center {
-      text-align: center;
-    }
-  </style>
-</head>
-<body>
   <h1>📝 Criar Novo Documento</h1>
 
+  <!-- ─── Pasta Selector ─────────────────────────────────────────────────── -->
   <div class="center">
     <label for="tipo">Escolha a pasta:</label>
     <select id="tipo">
@@ -65,155 +64,23 @@
       <option value="documento">Documento</option>
     </select>
   </div>
-
   <br>
 
+  <!-- ─── TinyMCE Editor ─────────────────────────────────────────────────── -->
   <div id="editor-container">
     <textarea id="editor"></textarea>
   </div>
 
+  <!-- ─── Save / Back Buttons ─────────────────────────────────────────────── -->
   <div class="center">
     <button onclick="salvarDocumento()">💾 Salvar</button>
     <button onclick="voltar()">🔙 Voltar</button>
   </div>
 
+  <!-- html2pdf for PDF export -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
-
-  <script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
-    import { getFirestore, doc, getDoc, updateDoc } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
-    import { getStorage, ref, uploadBytes } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-storage.js";
-
-    const firebaseConfig = {
-      apiKey: "AIzaSyAmF5FS_ekWW_7-1RUHtGCR71LH6r9fg08",
-      authDomain: "medcomvc-ubs.firebaseapp.com",
-      projectId: "medcomvc-ubs",
-      storageBucket: "medcomvc-ubs.firebasestorage.app",
-      messagingSenderId: "313420248004",
-      appId: "1:313420248004:web:a9a28d97b3ef2e33c36a91"
-    };
-
-    const app = initializeApp(firebaseConfig);
-    const db = getFirestore(app);
-    const storage = getStorage(app, "gs://medcomvc-ubs.firebasestorage.app");
-
-    const pacienteId = localStorage.getItem("pacienteSelecionado");
-    const medicoId = localStorage.getItem("uid");
-
-    tinymce.init({
-      selector: '#editor',
-      height: 500,
-      menubar: false,
-      plugins: 'lists image',
-      toolbar: 'undo redo | bold italic underline | bullist numlist | image',
-      branding: false,
-      automatic_uploads: true,
-      images_upload_handler: async function (blobInfo, success, failure) {
-        try {
-          const file = blobInfo.blob();
-          const filename = `imagem_${Date.now()}.jpg`;
-          const caminho = `pacientes/${pacienteId}/imagens/${filename}`;
-
-          const storageRef = ref(storage, caminho);
-          await uploadBytes(storageRef, file);
-
-          // Gera a URL de download
-          const { getDownloadURL } = await import("https://www.gstatic.com/firebasejs/10.8.1/firebase-storage.js");
-          const url = await getDownloadURL(storageRef);
-
-          success(url); // Insere a imagem no editor
-
-        } catch (err) {
-          console.error("Erro no upload de imagem:", err);
-          failure("Erro ao enviar imagem.");
-        }
-      },
-      file_picker_types: 'image',
-      file_picker_callback: function (callback, value, meta) {
-        if (meta.filetype === 'image') {
-          const input = document.createElement('input');
-          input.setAttribute('type', 'file');
-          input.setAttribute('accept', 'image/*');
-
-          input.onchange = function () {
-            const file = this.files[0];
-            const reader = new FileReader();
-
-            reader.onload = function () {
-              const id = 'blobid' + (new Date()).getTime();
-              const blobCache = tinymce.activeEditor.editorUpload.blobCache;
-              const base64 = reader.result.split(',')[1];
-              const blobInfo = blobCache.create(id, file, base64);
-              blobCache.add(blobInfo);
-
-              callback(blobInfo.blobUri(), { title: file.name });
-            };
-
-            reader.readAsDataURL(file);
-          };
-
-          input.click();
-        }
-      },
-      content_style: `
-        body { font-family: Helvetica, Arial, sans-serif; font-size: 14px; padding: 20px; }
-        img { max-width: 100%; height: auto; }
-      `
-    });
-
-    window.salvarDocumento = async function () {
-      const tipo = document.getElementById("tipo").value;
-      const htmlContent = tinymce.get("editor").getContent().trim();
-      const plainText = tinymce.get("editor").getContent({ format: "text" }).replace(/\s+/g, " ").trim();
-
-      if (!pacienteId || !tipo || !htmlContent || !medicoId) {
-        alert("Preencha o conteúdo e escolha uma pasta.");
-        return;
-      }
-
-      try {
-        const refDoc = doc(db, "pacientes", pacienteId);
-        const snap = await getDoc(refDoc);
-        if (!snap.exists()) throw new Error("Paciente não encontrado.");
-
-        const dados = snap.data();
-        const arrayAtual = Array.isArray(dados[tipo]) ? dados[tipo] : [];
-        arrayAtual.push(plainText);
-
-        await updateDoc(refDoc, { [tipo]: arrayAtual });
-
-        const agora = new Date();
-        const data = agora.toLocaleDateString("pt-BR").replace(/\//g, "-");
-        const hora = agora.toTimeString().slice(0, 5).replace(":", "-");
-        const nomePDF = `${pacienteId}_${tipo}_${data}_${hora}_${medicoId}.pdf`;
-
-        const elementoPDF = document.createElement("div");
-        elementoPDF.innerHTML = `<h1>Documento (${tipo})</h1>${htmlContent}`;
-
-        const opt = {
-          margin: 1,
-          filename: nomePDF,
-          image: { type: "jpeg", quality: 0.98 },
-          html2canvas: { scale: 2 },
-          jsPDF: { unit: "in", format: "a4", orientation: "portrait" }
-        };
-
-        const pdfBlob = await html2pdf().from(elementoPDF).set(opt).outputPdf("blob");
-        const storageRef = ref(storage, `pacientes/${pacienteId}/${tipo}/${nomePDF}`);
-        await uploadBytes(storageRef, pdfBlob);
-
-        alert("Documento salvo com sucesso!");
-        window.location.href = "paciente_view.html";
-
-      } catch (error) {
-        console.error("Erro ao salvar documento:", error);
-        alert("Erro ao salvar.");
-      }
-    };
-
-    window.voltar = function () {
-      window.location.href = "paciente_view.html";
-    };
-  </script>
+  
+  <!-- your unified application logic: -->
+  <script type="module" src="./script.js"></script>
 </body>
 </html>
