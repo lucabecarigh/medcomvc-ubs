@@ -30,8 +30,24 @@
   </style>
 </head>
 <body>
+
+  <!-- ─── ClinBot Audio + SOAP Panel ──────────────────────────────────────── -->
+  <div class="center" id="clinbot-panel">
+    <button id="record-btn">🔴 Gravar áudio</button>
+    <button id="stop-btn" disabled>⏹ Parar</button>
+    <select id="lang">
+      <option value="pt">Português (pt-BR)</option>
+      <option value="en">English</option>
+    </select>
+    <button id="transcribe-btn" disabled>📝 Transcrever</button>
+    <span id="transcribe-status"></span>
+    <button id="soap-btn">🗂️ Gerar SOAP</button>
+    <span id="soap-status"></span>
+  </div>
+
   <h1>📝 Criar Novo Documento</h1>
 
+  <!-- ─── Pasta Selector ─────────────────────────────────────────────────── -->
   <div class="center">
     <label for="tipo">Escolha a pasta:</label>
     <select id="tipo">
@@ -55,10 +71,12 @@
     </select>
   </div>
 
+  <!-- ─── TinyMCE Editor ─────────────────────────────────────────────────── -->
   <div id="editor-container">
     <textarea id="editor"></textarea>
   </div>
 
+  <!-- ─── Save / Back Buttons ─────────────────────────────────────────────── -->
   <div class="center">
     <button onclick="salvarDocumento()">💾 Salvar</button>
     <button onclick="clinbotPrimeiraAnalise()">🤖 Clinbot</button>
@@ -71,6 +89,7 @@
   <div class="center"><button id="clinbotAskBtn" onclick="clinbotPerguntar()" hidden>Enviar pergunta</button></div>
 
   <!-- Gerador de PDF -->
+  <!-- html2pdf for PDF export -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 
   <!-- Firebase + OpenAI -->

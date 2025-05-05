@@ -1,5 +1,9 @@
 // firebase-config.js
-import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
+import {
+  initializeApp,
+  getApps,
+  getApp
+} from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
 import { getFirestore } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
 import { getStorage } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-storage.js";
 
@@ -13,7 +17,11 @@ const firebaseConfig = {
   measurementId: "G-04YK0WXT42"
 };
 
-const app = initializeApp(firebaseConfig);
+// only initialize once, otherwise reuse existing app
+const app = !getApps().length
+  ? initializeApp(firebaseConfig)
+  : getApp();
+
 const db = getFirestore(app);
 const storage = getStorage(app, "gs://medcomvc-ubs.firebasestorage.app");
 
