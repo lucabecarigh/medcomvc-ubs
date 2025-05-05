@@ -9,57 +9,70 @@
   <link href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.css" rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.js"></script>
 
-  <!-- Estilos -->
   <style>
-    body           { font-family:sans-serif; margin:0; }
-    #calendar      { max-width:900px; margin:40px auto; }
-    #btnAdd        { position:fixed; bottom:25px; right:25px; padding:12px 18px;
-                     background:#0d6efd; color:#fff; border:none; border-radius:50%;
-                     font-size:24px; cursor:pointer; box-shadow:0 2px 6px rgba(0,0,0,.3);}
-    /* Sidebar */
-    #sidebar       { position:fixed; top:0; right:-400px; width:380px; height:100%;
-                     background:#fff; box-shadow:-2px 0 6px rgba(0,0,0,.2);
-                     padding:25px; transition:right .3s ease; overflow-y:auto; }
-    #sidebar.open  { right:0; }
-    #sidebar h2    { margin-top:0; }
-    #sidebar input, #sidebar select
-                   { width:100%; padding:8px; margin:8px 0 14px; box-sizing:border-box; }
-    #sidebar button{ margin-right:6px; padding:8px 14px; }
+    body      { font-family:sans-serif; margin:0; }
+    #calendar { max-width:900px; margin:20px auto; }
+
+    /* Header add button via FullCalendar custom button */
+    .fc-button-add { background:#198754; border: none; color:#fff; }
+
+    /* Modal base */
+    .modal        { position:fixed; inset:0; background:rgba(0,0,0,.6);
+                    display:none; align-items:center; justify-content:center; z-index:10000; }
+    .modal.open   { display:flex; }
+    .modal-box    { background:#fff; padding:25px; border-radius:8px; width:90%; max-width:400px;
+                    box-shadow:0 2px 10px rgba(0,0,0,.35); z-index:10001; }
+    .modal-box h2 { margin-top:0; }
+    .modal-box label, .modal-box input, .modal-box select {
+      display:block; width:100%; margin:8px 0; }
+    .modal-box input, .modal-box select { padding:8px; box-sizing:border-box; }
+    .modal-box button{ margin:10px 6px 0 0; padding:8px 14px; }
   </style>
 </head>
 <body>
   <div id="calendar"></div>
 
-  <!-- Botão flutuante -->
-  <button id="btnAdd">+</button>
+  <!-- Modal: adicionar / editar -->
+  <div id="modalForm" class="modal">
+    <div class="modal-box">
+      <h2 id="formTitle">Nova Consulta</h2>
 
-  <!-- Sidebar de nova consulta -->
-  <div id="sidebar">
-    <h2>Nova Consulta</h2>
-    <label>Paciente</label>
-    <select id="pacienteSelect"><option value="">Carregando...</option></select>
+      <label>Paciente</label>
+      <select id="pacienteSelect"></select>
 
-    <label>Data</label>
-    <input type="date" id="dataConsulta">
+      <label>Data</label>
+      <input type="date" id="dataConsulta">
 
-    <label>Hora</label>
-    <input type="time" id="horaConsulta">
+      <label>Hora</label>
+      <input type="time" id="horaConsulta">
 
-    <label>Título / Assunto</label>
-    <input type="text" id="tituloConsulta" placeholder="Ex.: Retorno hipertensão">
+      <label>Título</label>
+      <input type="text" id="tituloConsulta">
 
-    <label>Local</label>
-    <input type="text" id="localConsulta" placeholder="Ex.: UBS Central">
+      <label>Local</label>
+      <input type="text" id="localConsulta">
 
-    <button id="salvarConsulta">Salvar</button>
-    <button id="cancelarConsulta">Cancelar</button>
+      <button id="btnSave">Salvar</button>
+      <button id="btnCancel">Cancelar</button>
+    </div>
   </div>
 
-  <!-- Firebase -->
+  <!-- Modal: detalhes -->
+  <div id="modalDetalhe" class="modal">
+    <div class="modal-box">
+      <h2>Detalhes da Consulta</h2>
+      <div id="detalheTexto"></div>
+      <button id="btnEdit">Editar</button>
+      <button id="btnDelete" style="background:#dc3545;color:#fff;">Apagar</button>
+      <button id="btnClose">Fechar</button>
+    </div>
+  </div>
+
   <script type="module">
-    import { initializeApp }                      from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
+    import { initializeApp }                 from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
     import { getFirestore, doc, getDoc,
-             updateDoc, arrayUnion }             from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
+             updateDoc, arrayUnion, arrayRemove }
+                                            from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
 
     const firebaseConfig = {
       apiKey:            "AIzaSyAmF5FS_ekWW_7-1RUHtGCR71LH6r9fg08",
@@ -69,130 +82,154 @@
       messagingSenderId: "313420248004",
       appId:             "1:313420248004:web:a9a28d97b3ef2e33c36a91"
     };
-
     const app = initializeApp(firebaseConfig);
     const db  = getFirestore(app);
 
-    /* ---------- Variáveis ---------- */
-    const uidMedico  = localStorage.getItem("uid");
+    const uidMedico = localStorage.getItem("uid");
     if (!uidMedico) { alert("Médico não logado."); window.history.back(); }
 
-    let calendar;          // instância FullCalendar
-    let pacientesMap = {}; // {uid: "Nome Sobrenome"}
-
-    /* ---------- Inicia calendário ---------- */
+    let pacientesMap = {};
+    let calendar;
+    let editing = false;
+    let oldEvento = null;
+    
     document.addEventListener("DOMContentLoaded", async () => {
       await carregarPacientes();
-      await iniciarCalendario();
+      iniciarCalendar();
     });
 
-    async function carregarPacientes() {
-      try {
-        const medSnap = await getDoc(doc(db,"medicos",uidMedico));
-        if (!medSnap.exists()) { alert("Médico não encontrado."); return; }
-        const uids = medSnap.data().meuspacientes || [];
-        if (uids.length===0) { document.getElementById("pacienteSelect").innerHTML="<option value=''>Nenhum paciente</option>"; return; }
-
-        const select = document.getElementById("pacienteSelect");
-        select.innerHTML = "<option value=''>-- Selecione --</option>";
-
-        for (const uid of uids) {
-          const pSnap = await getDoc(doc(db,"pacientes",uid));
-          if (!pSnap.exists()) continue;
-          const id = pSnap.data().identificacao?.[0] || {};
-          const nomeCompleto = `${id.nome||"Sem"} ${id.sobrenome||"Nome"}`.trim();
-          pacientesMap[uid] = nomeCompleto;
-          const opt = document.createElement("option");
-          opt.value = uid; opt.textContent = nomeCompleto;
-          select.appendChild(opt);
-        }
-      } catch(e){ console.error(e); }
+    async function carregarPacientes(){
+      const medSnap = await getDoc(doc(db,"medicos",uidMedico));
+      const uids = medSnap.data().meuspacientes||[];
+      const sel = document.getElementById("pacienteSelect");
+      sel.innerHTML = "<option value=''>-- Selecione --</option>";
+      for(const uid of uids){
+        const pSnap = await getDoc(doc(db,"pacientes",uid));
+        const id = pSnap.data().identificacao?.[0]||{};
+        const nome = `${id.nome||""} ${id.sobrenome||""}`.trim();
+        pacientesMap[uid]=nome;
+        const opt = document.createElement("option"); opt.value=uid; opt.textContent=nome;
+        sel.appendChild(opt);
+      }
     }
 
-    async function iniciarCalendario(){
-      /* Busca compromissos existentes */
-      let eventos = [];
-      try{
-        const medSnap = await getDoc(doc(db,"medicos",uidMedico));
-        if (medSnap.exists()){
-          const arr = medSnap.data().calendario || [];
-          eventos = arr.map(ev => ({
-            title: `${ev.titulo} – ${pacientesMap[ev.uidPaciente]||"Paciente"}`,
-            start: ev.dataHora,
-            extendedProps:ev
-          }));
-        }
-      }catch(e){ console.error(e); }
+    function iniciarCalendar(){
+      const medRef = doc(db,"medicos",uidMedico);
+      getDoc(medRef).then(snap=>{
+        const arr = snap.data().calendario||[];
+        const events = arr.map(ev=>({
+          id: ev.id,
+          title:`${ev.titulo} – ${pacientesMap[ev.uidPaciente]||""}`,
+          start: ev.dataHora,
+          extendedProps: ev
+        }));
 
-      const calendarEl = document.getElementById("calendar");
-      calendar = new FullCalendar.Calendar(calendarEl,{
-        locale:"pt-br",
-        initialView:"dayGridMonth",
-        headerToolbar:{ left:"prev,next today", center:"title", right:"" },
-        events: eventos
+        calendar = new FullCalendar.Calendar(
+          document.getElementById("calendar"),{
+          locale:"pt-br",
+          initialView:"dayGridMonth",
+          headerToolbar:{
+            left: 'prev,next today',
+            center: 'title addEvent',
+            right: ''
+          },
+          customButtons:{
+            addEvent:{ text:'Adicionar', click:()=> openForm() }
+          },
+          events: events,
+          eventClick: info=> openDetail(info.event)
+        });
+        calendar.render();
       });
-      calendar.render();
     }
 
-    /* ---------- UI: abrir/fechar sidebar ---------- */
-    const sidebar = document.getElementById("sidebar");
-    document.getElementById("btnAdd").onclick       = ()=> sidebar.classList.add("open");
-    document.getElementById("cancelarConsulta").onclick = ()=> sidebar.classList.remove("open");
+    /* FORM MODAL */
+    const formModal = document.getElementById("modalForm");
+    const dt = { sel:'#pacienteSelect', date:'#dataConsulta', time:'#horaConsulta', title:'#tituloConsulta', loc:'#localConsulta' };
+    const get = id=>document.querySelector(id);
+    document.getElementById("btnCancel").onclick = ()=> closeForm();
+    document.getElementById("btnSave").onclick = saveEvent;
 
-    /* ---------- Salvar consulta ---------- */
-    document.getElementById("salvarConsulta").onclick = async ()=>{
-      const uidPaciente = document.getElementById("pacienteSelect").value;
-      const data        = document.getElementById("dataConsulta").value;
-      const hora        = document.getElementById("horaConsulta").value;
-      const titulo      = document.getElementById("tituloConsulta").value.trim();
-      const local       = document.getElementById("localConsulta").value.trim();
+    function openForm(){
+      editing=false; oldEvento=null;
+      get('#formTitle').textContent = 'Nova Consulta';
+      openModal(formModal);
+    }
 
-      if (!uidPaciente||!data||!hora||!titulo||!local){
-        alert("Preencha todos os campos."); return;
-      }
+    function closeForm(){ clearForm(); closeModal(formModal); }
 
-      const dataHoraISO = `${data}T${hora}:00`;
+    function openModal(m){ m.classList.add('open'); }
+    function closeModal(m){ m.classList.remove('open'); }
 
-      /* Objeto de compromisso */
-      const evento = {
-        uidMedico,
-        uidPaciente,
-        dataHora: dataHoraISO,
-        titulo,
-        local
+    function clearForm(){ for(let k in dt) get(dt[k]).value = ''; }
+
+    async function saveEvent(){
+      const uidP = get(dt.sel).value;
+      const d = get(dt.date).value;
+      const t = get(dt.time).value;
+      const ti= get(dt.title).value.trim();
+      const lo= get(dt.loc).value.trim();
+      if(!uidP||!d||!t||!ti||!lo){ return alert('Preencha todos os campos.'); }
+      const dataHora = `${d}T${t}:00`;
+      const ev = {
+        id: editing? oldEvento.id: Date.now().toString(),
+        uidMedico, uidPaciente: uidP, dataHora, titulo: ti, local: lo
       };
-
+      const medDoc = doc(db,"medicos",uidMedico);
       try{
-        /* Adiciona no médico */
-        await updateDoc(doc(db,"medicos",uidMedico),{
-          calendario: arrayUnion(evento)
-        });
-        /* Adiciona no paciente */
-        await updateDoc(doc(db,"pacientes",uidPaciente),{
-          calendario: arrayUnion(evento)
-        });
+        if(editing){
+          await Promise.all([
+            updateDoc(medDoc,{ calendario: arrayRemove(oldEvento)}),
+            updateDoc(doc(db,"pacientes",oldEvento.uidPaciente),{ calendario: arrayRemove(oldEvento)})
+          ]);
+          calendar.getEventById(oldEvento.id)?.remove();
+        }
+        await Promise.all([
+          updateDoc(medDoc,{ calendario: arrayUnion(ev)}),
+          updateDoc(doc(db,"pacientes",uidP),{ calendario: arrayUnion(ev)})
+        ]);
+        calendar.addEvent({ id:ev.id, title:`${ti} – ${pacientesMap[uidP]}`, start:dataHora, extendedProps:ev });
+        closeForm();
+      }catch(e){ console.error(e); alert('Erro ao salvar.'); }
+    }
 
-        /* Atualiza calendário em tela */
-        calendar.addEvent({
-          title:`${titulo} – ${pacientesMap[uidPaciente]||"Paciente"}`,
-          start:dataHoraISO,
-          extendedProps:evento
-        });
-
-        sidebar.classList.remove("open");
-        limparFormulario();
-      }catch(e){
-        console.error(e);
-        alert("Erro ao salvar consulta.");
-      }
+    /* DETAIL MODAL */
+    const detailModal = document.getElementById("modalDetalhe");
+    const txt = document.getElementById("detalheTexto");
+    let currentEvent=null;
+    document.getElementById("btnClose").onclick = ()=> closeModal(detailModal);
+    document.getElementById("btnDelete").onclick = async ()=>{
+      if(!currentEvent) return;
+      const ev = currentEvent.extendedProps;
+      if(!confirm('Apagar este compromisso?')) return;
+      try{
+        await Promise.all([
+          updateDoc(doc(db,"medicos",uidMedico),{ calendario: arrayRemove(ev)}),
+          updateDoc(doc(db,"pacientes",ev.uidPaciente),{ calendario: arrayRemove(ev)})
+        ]);
+        currentEvent.remove(); closeModal(detailModal);
+      }catch(e){ console.error(e); alert('Erro ao apagar.'); }
+    };
+    document.getElementById("btnEdit").onclick = ()=>{
+      const ev = currentEvent.extendedProps;
+      editing=true; oldEvento=ev;
+      openForm(); closeModal(detailModal);
+      get(dt.sel).value=ev.uidPaciente;
+      get(dt.date).value=ev.dataHora.slice(0,10);
+      get(dt.time).value=ev.dataHora.slice(11,16);
+      get(dt.title).value=ev.titulo;
+      get(dt.loc).value=ev.local;
     };
 
-    function limparFormulario(){
-      document.getElementById("pacienteSelect").value="";
-      document.getElementById("dataConsulta").value="";
-      document.getElementById("horaConsulta").value="";
-      document.getElementById("tituloConsulta").value="";
-      document.getElementById("localConsulta").value="";
+    function openDetail(event){
+      currentEvent = event;
+      const ev = event.extendedProps;
+      txt.innerHTML =
+        `<b>Título:</b> ${ev.titulo}<br>`+
+        `<b>Paciente:</b> ${pacientesMap[ev.uidPaciente]||''}<br>`+
+        `<b>Data/Hora:</b> ${new Date(ev.dataHora).toLocaleString('pt-BR')}<br>`+
+        `<b>Local:</b> ${ev.local}`;
+      openModal(detailModal);
     }
   </script>
 </body>
