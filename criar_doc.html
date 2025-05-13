@@ -32,6 +32,7 @@
 <body>
   <h1>📝 Criar Novo Documento</h1>
 
+  <!-- Escolha de pasta e template -->
   <div class="center">
     <label for="tipo">Escolha a pasta:</label>
     <select id="tipo">
@@ -55,14 +56,23 @@
     </select>
   </div>
 
+  <!-- TinyMCE -->
   <div id="editor-container">
     <textarea id="editor"></textarea>
   </div>
 
+  <!-- Botões principais -->
   <div class="center">
     <button onclick="salvarDocumento()">💾 Salvar</button>
     <button onclick="clinbotPrimeiraAnalise()">🤖 Clinbot</button>
     <button onclick="voltar()">🔙 Voltar</button>
+  </div>
+
+  <!-- Gravador de áudio -->
+  <div class="center" id="audioControls">
+    <button id="recordBtn" onclick="iniciarGravacao()">🎙️ Gravar consulta</button>
+    <button id="stopBtn"   onclick="pararGravacao()" hidden>⏹️ Parar</button>
+    <span   id="tempoLabel"></span>
   </div>
 
   <!-- Área de chat / respostas -->
@@ -73,7 +83,7 @@
   <!-- Gerador de PDF -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 
-  <!-- Firebase + OpenAI -->
+  <!-- Firebase + OpenAI + toda a lógica -->
   <script type="module">
     /* ---------- Firebase ---------- */
     import { initializeApp }                          from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
@@ -81,14 +91,14 @@
     import { getStorage, ref, uploadBytes, getDownloadURL }
                                                      from "https://www.gstatic.com/firebasejs/10.8.1/firebase-storage.js";
 
-    const firebaseConfig = {
-      apiKey:            "AIzaSyAmF5FS_ekWW_7-1RUHtGCR71LH6r9fg08",
-      authDomain:        "medcomvc-ubs.firebaseapp.com",
-      projectId:         "medcomvc-ubs",
-      storageBucket:     "medcomvc-ubs.firebasestorage.app",
-      messagingSenderId: "313420248004",
-      appId:             "1:313420248004:web:a9a28d97b3ef2e33c36a91"
-    };
+const firebaseConfig = {
+  apiKey:            "AIzaSyAmF5FS_ekWW_7-1RUHtGCR71LH6r9fg08",
+  authDomain:        "medcomvc-ubs.firebaseapp.com",
+  projectId:         "medcomvc-ubs",
+  storageBucket:     "medcomvc-ubs.firebasestorage.app",
+  messagingSenderId: "313420248004",
+  appId:             "1:313420248004:web:a9a28d97b3ef2e33c36a91"
+};
 
     const app     = initializeApp(firebaseConfig);
     const db      = getFirestore(app);
@@ -100,7 +110,6 @@
 
     /* ---------- OpenAI ---------- */
     let OPENAI_API_KEY = localStorage.getItem("openaiApiKey") || "";
-
     function pedirApiKey() {
       if (OPENAI_API_KEY) return true;
       const k = prompt("Digite sua OpenAI API Key (fica salva apenas neste navegador):");
@@ -110,10 +119,10 @@
       return true;
     }
 
-    /* ---------- Prompt base ---------- */
+    /* ---------- Prompt base Clinbot ---------- */
     const systemPrompt = `Você é um médico assistente inteligente. Avalie cuidadosamente a consulta abaixo e atue como apoio clínico.
 
-1. Leia o conteúdo da consulta e faça uma análise detalhada e organizada na sua memória. 
+1. Leia o conteúdo da consulta e faça uma análise detalhada e organizada na sua memória.
 2. Avalie o que falta na anamnese, revisão de sistemas, exame físico ou plano.
 3. Proponha hipóteses diagnósticas prováveis caso ainda não tenham sido.
 4. Sugira exames complementares relevantes, scores e uma possível conduta/resumo do plano clínico caso seja necessário.
@@ -124,8 +133,13 @@
 9. Baseie-se apenas nas melhores fontes e diretrizes, sempre atualizadas com as melhores práticas.
 10. Sempre cite as fontes das informações.`;
 
-    /* ---------- Histórico de conversa ---------- */
+    /* ---------- Histórico de conversa (Clinbot) ---------- */
     const conversation = []; // {role:"user"/"assistant", content:"..."}
+
+    /* ---------- Áudio / Transcrição ---------- */
+    let mediaRecorder = null;
+    let audioChunks   = [];
+    let cronometro    = null;
 
     /* ---------- TinyMCE ---------- */
     tinymce.init({
@@ -190,7 +204,7 @@
       }
     });
 
-    /* ---------- Salvar documento (PDF + redirecionar) ---------- */
+    /* ---------- Salvar documento (PDF + Firestore) ---------- */
     window.salvarDocumento = async function () {
       const tipo        = document.getElementById("tipo").value;
       const htmlContent = tinymce.get("editor").getContent().trim();
@@ -270,7 +284,7 @@
       if (!pedirApiKey()) return;
 
       /* Monta mensagens */
-      conversation.length = 0; // zera caso médico clique novamente
+      conversation.length = 0; // zera
       conversation.push({ role:"user", content: plainText });
 
       await chamarOpenAI(); // faz chamada e exibe chat
@@ -290,7 +304,7 @@
       await chamarOpenAI();
     };
 
-    /* ---------- Função comum para chamar a OpenAI ---------- */
+    /* ---------- Função comum para chamar a OpenAI (Clinbot) ---------- */
     async function chamarOpenAI() {
       const chatDiv = document.getElementById("clinbotChat");
       chatDiv.hidden = false;
@@ -338,6 +352,131 @@
 
     /* ---------- Voltar ---------- */
     window.voltar = () => window.location.href = "paciente_view.html";
+
+    /* ================================================================= */
+    /* ===            ÁUDIO  –  GRAVAR • TRANSCRIBIR • SOAP           === */
+    /* ================================================================= */
+
+    /* ---------- Iniciar gravação ---------- */
+    window.iniciarGravacao = async function () {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio:true });
+        audioChunks  = [];
+        mediaRecorder = new MediaRecorder(stream, { mimeType:"audio/webm" });
+
+        mediaRecorder.ondataavailable = e => audioChunks.push(e.data);
+        mediaRecorder.onstop          = processarGravacao;
+
+        mediaRecorder.start();
+        document.getElementById("recordBtn").hidden = true;
+        document.getElementById("stopBtn").hidden   = false;
+
+        /* cronômetro */
+        const label = document.getElementById("tempoLabel");
+        let segundos = 0;
+        cronometro = setInterval(() => {
+          segundos++;
+          const min = String(Math.floor(segundos/60)).padStart(2,"0");
+          const seg = String(segundos%60).padStart(2,"0");
+          label.textContent = `${min}:${seg}`;
+        }, 1000);
+
+      } catch (err) {
+        console.error("Permissão negada:", err);
+        alert("Não foi possível acessar o microfone.");
+      }
+    };
+
+    /* ---------- Parar gravação ---------- */
+    window.pararGravacao = function () {
+      if (mediaRecorder && mediaRecorder.state !== "inactive") mediaRecorder.stop();
+      clearInterval(cronometro);
+      document.getElementById("tempoLabel").textContent = "";
+      document.getElementById("recordBtn").hidden = false;
+      document.getElementById("stopBtn").hidden   = true;
+    };
+
+    /* ---------- Processar gravação ---------- */
+    async function processarGravacao() {
+      const blob      = new Blob(audioChunks, { type:"audio/webm" });
+      const filename  = `consulta_${Date.now()}.webm`;
+
+      /* Salva áudio bruto (opcional) */
+      try {
+        const audioRef = ref(storage, `pacientes/${pacienteId}/audio/${filename}`);
+        await uploadBytes(audioRef, blob);
+      } catch (e) {
+        console.warn("Falha ao enviar áudio:", e);
+      }
+
+      /* Transcreve com Whisper */
+      const textoTranscrito = await transcreverAudio(blob);
+      if (!textoTranscrito) { alert("Erro na transcrição."); return; }
+
+      /* Gera nota SOAP com GPT‑4 */
+      const soapNote = await gerarNotaSOAP(textoTranscrito);
+      if (!soapNote) { alert("Erro ao gerar nota SOAP."); return; }
+
+      /* Coloca no editor */
+      tinymce.get("editor").setContent(`<pre style="white-space:pre-wrap;">${soapNote}</pre>`);
+      alert("Transcrição concluída e nota SOAP gerada!");
+    }
+
+    /* ---------- Transcrição via backend ---------- */
+async function transcreverAudio(blob) {
+  const formData = new FormData();
+  formData.append(
+    "file",
+    new File([blob], "consulta.webm", { type: "audio/webm" })
+  );
+
+  try {
+    const resp = await fetch("http://127.0.0.1:8000/transcribe/", {
+      method: "POST",
+      body: formData,
+    });
+    if (!resp.ok) throw new Error(await resp.text());
+    const data = await resp.json();
+    return data.transcript || null;
+  } catch (e) {
+    console.error("Erro na transcrição:", e);
+    return null;
+  }
+}
+
+    /* ---------- Geração da nota SOAP ---------- */
+    async function gerarNotaSOAP(transcricao) {
+      const promptSOAP = `
+Você é um médico de família experiente. 
+Com base na transcrição de consulta a seguir, produza um prontuário completo no formato **SOAP**,
+usando terminologia médica precisa e atualizada, contemplando:
+
+• **S (Subjective)** – queixa principal, HDA, antecedentes, medicações, alergias, revisão de sistemas resumida.  
+• **O (Objective)** – sinais vitais, exame físico (sistematizado), exames complementares disponíveis.  
+• **A (Assessment)** – diagnóstico(s) diferencial(is) e principal(is) com raciocínio breve.  
+• **P (Plan)** – plano diagnóstico, terapêutico, educacional, rastreamento, follow‑up, retorno ou referência.  
+
+Inclua tópicos de prevenção, guidelínes recentes e códigos CID‑10 se cabíveis.  
+Não invente dados; se algo não foi dito, registre como *“Não avaliado”*.
+
+Transcrição:
+"""${transcricao}"""
+`;
+
+try {
+    const resp = await fetch("http://127.0.0.1:8000/summarize/", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ transcript: transcricao }),
+    });
+    if (!resp.ok) throw new Error(await resp.text());
+    const data = await resp.json();
+    return data.soap || null;
+  } catch (e) {
+    console.error("Erro ao gerar SOAP:", e);
+    return null;
+  }
+    }
   </script>
 </body>
 </html>
