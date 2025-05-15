@@ -9,12 +9,11 @@
 <body>
   <h1>📄 Resumo do Paciente</h1>
   <div id="resumoContainer">
-    <p>Carregando textos e PDFs...</p>
+    <p>Carregando PDFs...</p>
   </div>
 
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
-    import { getFirestore, doc, getDoc } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
     import { getStorage, ref, listAll, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-storage.js";
 
     // 🔐 CONFIG
@@ -28,7 +27,6 @@
     };
 
     const app = initializeApp(firebaseConfig);
-    const db = getFirestore(app);
     const storage = getStorage(app, "gs://medcomvc-ubs.firebasestorage.app");
 
     const pacienteId = localStorage.getItem("pacienteSelecionado");
@@ -41,20 +39,10 @@
         return;
       }
 
-      container.innerHTML = "<p>Carregando textos e PDFs...</p>";
+      container.innerHTML = "<p>Carregando PDFs...</p>";
 
       try {
-        // 🔸 1. TEXTOS DO FIRESTORE
-        const docRef = doc(db, "pacientes", pacienteId);
-        const docSnap = await getDoc(docRef);
-
-        let textos = [];
-        if (docSnap.exists()) {
-          const dados = docSnap.data();
-          textos = dados[pasta] || [];
-        }
-
-        // 🔸 2. LISTAR PDFS DO STORAGE
+        // 🔸 LISTAR PDFS DO STORAGE
         const pastaRef = ref(storage, `pacientes/${pacienteId}/${pasta}`);
         const lista = await listAll(pastaRef);
         const urlsPDFs = await Promise.all(
@@ -64,16 +52,8 @@
           })
         );
 
-        // 🔸 3. EXIBIR RESULTADOS
+        // 🔸 EXIBIR RESULTADOS
         container.innerHTML = "";
-
-        // Mostrar textos
-        textos.forEach((texto, index) => {
-          const div = document.createElement("div");
-          div.classList.add("resumo-item");
-          div.innerHTML = `<h3>📝 Texto ${index + 1}</h3><pre>${texto}</pre>`;
-          container.appendChild(div);
-        });
 
         // Mostrar PDFs
         urlsPDFs.forEach((pdf) => {
@@ -83,7 +63,7 @@
           container.appendChild(div);
         });
 
-        if (textos.length === 0 && urlsPDFs.length === 0) {
+        if (urlsPDFs.length === 0) {
           container.innerHTML = "<p>Nenhum conteúdo encontrado na pasta 'resumo'.</p>";
         }
       } catch (error) {
