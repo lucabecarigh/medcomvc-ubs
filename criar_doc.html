@@ -13,7 +13,11 @@
   <style>
     body             { background:#f2f6f8; padding:20px; font-family:sans-serif; }
     h1               { text-align:center; }
-    #editor-container{ max-width:1000px; margin:auto; }
+/* garante que o editor fique atrás do modal */
+    #editor-container {
+    position: relative;
+    z-index: 1;
+  }    
     textarea#editor  { min-height:500px; }
 
     .center          { text-align:center; margin-bottom:20px; }
@@ -29,6 +33,8 @@
                        display:block; padding:10px; }
   </style>
 </head>
+
+
 <body>
   <h1>📝 Criar Novo Documento</h1>
 
@@ -56,24 +62,35 @@
     </select>
   </div>
 
+
+
   <!-- TinyMCE -->
   <div id="editor-container">
     <textarea id="editor"></textarea>
   </div>
+
+<!-- Gravador de áudio -->
+<div class="center" id="audioControls">
+  <button id="recordBtn" onclick="iniciarGravacao()">🎙️ Gravar consulta</button>
+  <button id="stopBtn"   onclick="pararGravacao()" hidden>⏹️ Parar</button>
+  <span   id="tempoLabel"></span>
+</div>
 
   <!-- Botões principais -->
   <div class="center">
     <button onclick="salvarDocumento()">💾 Salvar</button>
     <button onclick="clinbotPrimeiraAnalise()">🤖 Clinbot</button>
     <button onclick="voltar()">🔙 Voltar</button>
+    <button
+  onclick="window.open('./MedUtis/index.html', '_blank')"  
+  style="margin:5px; padding:8px 15px;"
+>
+  💊 med.utis
+    </button>
+
   </div>
 
-  <!-- Gravador de áudio -->
-  <div class="center" id="audioControls">
-    <button id="recordBtn" onclick="iniciarGravacao()">🎙️ Gravar consulta</button>
-    <button id="stopBtn"   onclick="pararGravacao()" hidden>⏹️ Parar</button>
-    <span   id="tempoLabel"></span>
-  </div>
+  
 
   <!-- Área de chat / respostas -->
   <div id="clinbotChat" hidden></div>
@@ -387,6 +404,8 @@ const firebaseConfig = {
       }
     };
 
+
+    
     /* ---------- Parar gravação ---------- */
     window.pararGravacao = function () {
       if (mediaRecorder && mediaRecorder.state !== "inactive") mediaRecorder.stop();
@@ -477,6 +496,10 @@ try {
     return null;
   }
     }
+    
+
   </script>
+
+  
 </body>
 </html>

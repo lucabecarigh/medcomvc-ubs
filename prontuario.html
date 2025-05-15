@@ -8,11 +8,10 @@
 </head>
 <body>
   <h1>📒 Prontuário do Paciente</h1>
-  <div id="resumoContainer"><p>Carregando textos e PDFs...</p></div>
+  <div id="resumoContainer"><p>Carregando PDFs...</p></div>
 
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
-    import { getFirestore, doc, getDoc } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
     import { getStorage, ref, listAll, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-storage.js";
 
     const firebaseConfig = {
@@ -25,7 +24,6 @@
     };
 
     const app = initializeApp(firebaseConfig);
-    const db = getFirestore(app);
     const storage = getStorage(app, "gs://medcomvc-ubs.firebasestorage.app");
 
     const pacienteId = localStorage.getItem("pacienteSelecionado");
@@ -39,10 +37,6 @@
       }
 
       try {
-        const docRef = doc(db, "pacientes", pacienteId);
-        const docSnap = await getDoc(docRef);
-        const textos = docSnap.exists() ? docSnap.data()[pasta] || [] : [];
-
         const pastaRef = ref(storage, `pacientes/${pacienteId}/${pasta}`);
         const lista = await listAll(pastaRef);
         const urlsPDFs = await Promise.all(
@@ -53,21 +47,14 @@
         );
 
         container.innerHTML = "";
-
-        textos.forEach((texto, i) => {
-          const div = document.createElement("div");
-          div.innerHTML = `<h3>📝 Texto ${i + 1}</h3><pre>${texto}</pre>`;
-          container.appendChild(div);
-        });
-
         urlsPDFs.forEach(pdf => {
           const div = document.createElement("div");
           div.innerHTML = `<h3>📎 ${pdf.nome}</h3><a href="${pdf.url}" target="_blank">📂 Abrir PDF</a>`;
           container.appendChild(div);
         });
 
-        if (textos.length === 0 && urlsPDFs.length === 0) {
-          container.innerHTML = "<p>Nenhum conteúdo encontrado na pasta 'prontuário'.</p>";
+        if (urlsPDFs.length === 0) {
+          container.innerHTML = "<p>Nenhum conteúdo PDF encontrado na pasta 'prontuário'.</p>";
         }
       } catch (error) {
         console.error("Erro ao carregar:", error);
