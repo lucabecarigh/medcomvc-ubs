@@ -1,4 +1,7 @@
 // script.js
+import 'https://cdn.jsdelivr.net/npm/tinymce@6.8.3/tinymce.min.js';
+console.log('✅ script.js carregado!');
+
 console.log("✅ script.js carregado!");
 
 // 1) Firebase (shared) + Firestore / Storage helpers
@@ -332,15 +335,7 @@ document.addEventListener('DOMContentLoaded', () => {
         });
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
   
-        const { soap } = await res.json();
-  
-        // ─── Strip Markdown fences (```json ... ```) ──────────────────────────────────
-        const cleaned = soap
-          .replace(/```json\s*/g, '')    // remove leading ```json
-          .replace(/```/g, '')           // remove trailing ```
-          .trim();
-  
-        const obj = JSON.parse(cleaned);
+        const obj = await res.json();
   
         // ─── Build the HTML fragment ────────────────────────────────────────────────
         const html = `
