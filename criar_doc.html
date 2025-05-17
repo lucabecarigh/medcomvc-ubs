@@ -161,6 +161,7 @@ const firebaseConfig = {
     let isPaused        = false;
     let cronometro      = null;
     let transcriptChunks = [];   // Armazena todos os textos já transcritos
+    let keepCycling = false;      // controla se deve continuar gerando blobs
     let audioBuffer     = [];    // Buffer em tempo real para o último chunk
     let soapTimeout     = null;  // Usado para garantir 1 chamada SOAP por chunk
 
@@ -410,6 +411,7 @@ window.iniciarGravacao = async () => {
                      ? "audio/webm;codecs=opus" : "audio/ogg;codecs=opus";
     mediaRecorder  = new MediaRecorder(stream,{ mimeType });
 
+    keepCycling = true;           // gravação ativa → permite reiniciar ciclos
     /* reinicia o gravador a cada 10 s para garantir cabeçalho válido */
     function startCycle(){
       mediaRecorder.start();
@@ -422,9 +424,9 @@ window.iniciarGravacao = async () => {
       if(e.data && e.data.size && !isPaused) processBlob(e.data);
     };
 
-    mediaRecorder.onstop = ()=>{
-      if(!isPaused) startCycle();                // novo ciclo contínuo
-    };
+    mediaRecorder.onstop = () => {
+  if (keepCycling && !isPaused) startCycle();   // só reinicia se ainda gravando
+};
 
     /* -------- UI -------- */
     document.getElementById("recordBtn").hidden  = true;
@@ -475,6 +477,7 @@ window.retomarGravacao = () => {
 
 /* ---------- Parar gravação ---------- */
 window.pararGravacao = () => {
+  
   clearTimeout(chunkTimer);
   if(mediaRecorder && mediaRecorder.state!=="inactive") mediaRecorder.stop();
   finalizarGravacao();
