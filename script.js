@@ -1,6 +1,5 @@
 // script.js
 import 'https://cdn.jsdelivr.net/npm/tinymce@6.8.3/tinymce.min.js';
-console.log('✅ script.js carregado!');
 
 console.log("✅ script.js carregado!");
 
@@ -153,6 +152,7 @@ tinymce.init({
   plugins: 'lists image',
   toolbar: 'undo redo | bold italic underline | bullist numlist | image',
   branding: false,
+  base_url: 'https://cdn.jsdelivr.net/npm/tinymce@6.8.3',
   automatic_uploads: true,
   images_upload_handler: async (blobInfo, success, failure) => {
     try {
@@ -355,3 +355,38 @@ document.addEventListener('DOMContentLoaded', () => {
     });  
 });
 
+const COPILOT_URL = "http://127.0.0.1:8000/copilot/";
+
+window.toggleCopilot = () => {
+  const panel = document.getElementById("copilot-panel");
+  panel.style.display = panel.style.display === "none" ? "block" : "none";
+};
+
+window.fazerPerguntaCopilot = async () => {
+  const question = document.getElementById("copilot-question").value.trim();
+  const transcript = tinymce.get('editor').getContent({ format: 'text' }).trim();
+
+  if (!question || !transcript) {
+    alert("Digite uma pergunta e garanta que há conteúdo transcrito no editor.");
+    return;
+  }
+
+  const output = document.getElementById("copilot-response");
+  output.textContent = "Pensando…";
+
+  try {
+    const res = await fetch(COPILOT_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ transcript, question })
+    });
+
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const { response } = await res.json();
+    output.innerHTML = response.replace(/\n/g, "<br>");
+
+  } catch (err) {
+    console.error("Erro no Copilot:", err);
+    output.textContent = "Erro ao processar sua pergunta.";
+  }
+};

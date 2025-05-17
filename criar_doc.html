@@ -68,6 +68,19 @@
     <textarea id="editor"></textarea>
   </div>
 
+  <!-- ─── ClinBot Copilot Chat ─────────────────────────────────────────────────── -->
+  <div class="center">
+    <button onclick="window.toggleCopilot()" style="margin-top:20px;">🤖 Mostrar/Ocultar Copilot</button>
+  </div>
+
+  <div id="copilot-panel" style="display:none; max-width: 900px; margin: 20px auto; background:#ffffff; padding:20px; border-radius:10px; box-shadow:0 0 10px rgba(0,0,0,0.1);">
+    <h3>ClinBot Copilot</h3>
+    <textarea id="copilot-question" rows="3" placeholder="Digite sua pergunta..." style="width:100%; padding:10px;"></textarea>
+    <br>
+    <button onclick="fazerPerguntaCopilot()">Enviar pergunta</button>
+    <div id="copilot-response" style="margin-top: 15px; padding: 10px; background:#f9f9f9; border-left: 3px solid #007bff;"></div>
+  </div>
+
   <!-- ─── Save / Back Buttons ─────────────────────────────────────────────── -->
   <div class="center">
     <button onclick="salvarDocumento()">💾 Salvar</button>
