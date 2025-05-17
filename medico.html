@@ -19,9 +19,18 @@
 <body>
   <h1>👨‍⚕️ Meus Pacientes</h1>
 
-  <div id="lista-pacientes">
-    <p>Carregando pacientes...</p>
-  </div>
+<!-- Filtro + Tabela -->
+<input id="filtroPac" type="text" placeholder="🔍 Pesquisar paciente..." style="width:300px;margin:8px 0;padding:6px;">
+<table id="tblPacientes" border="1" style="border-collapse:collapse;width:100%;max-width:600px;">
+  <thead>
+    <tr>
+      <th data-col="nome">Nome ▲▼</th>
+      <th data-col="sobrenome">Sobrenome ▲▼</th>
+      <th data-col="idade">Idade ▲▼</th>
+    </tr>
+  </thead>
+  <tbody><tr><td colspan="3">Carregando pacientes...</td></tr></tbody>
+</table>
 
   <button class="btn-consultas" onclick="abrirCalendario()">📅 Ver todas as consultas</button>
   <button class="btn-consultas" onclick="abrirModalNovoPaciente()">➕ Adicionar novo paciente</button>
@@ -64,36 +73,67 @@
     const db   = getFirestore(app);
     const auth = getAuth(app);
 
-    /* ---------- Listar pacientes do médico ---------- */
     async function listarPacientes() {
-      const container = document.getElementById('lista-pacientes');
-      container.innerHTML = "<p>Carregando pacientes...</p>";
+  const tbody = document.querySelector("#tblPacientes tbody");
+  tbody.innerHTML = "<tr><td colspan='3'>Carregando...</td></tr>";
 
-      const uidMedico = localStorage.getItem("uid");
-      if (!uidMedico) { container.innerHTML = "<p>Erro: médico não identificado.</p>"; return; }
+  const uidMedico = localStorage.getItem("uid");
+  if (!uidMedico) { tbody.innerHTML = "<tr><td colspan='3'>Erro: médico não identificado.</td></tr>"; return; }
 
-      try {
-        const medicoSnap = await getDoc(doc(db,"medicos",uidMedico));
-        if (!medicoSnap.exists()) { container.innerHTML = "<p>Médico não encontrado.</p>"; return; }
+  try {
+    const medicoSnap = await getDoc(doc(db,"medicos",uidMedico));
+    if (!medicoSnap.exists()) { tbody.innerHTML = "<tr><td colspan='3'>Médico não encontrado.</td></tr>"; return; }
 
-        const meuspacientes = medicoSnap.data().meuspacientes || [];
-        if (meuspacientes.length===0){ container.innerHTML="<p>Você ainda não tem pacientes.</p>"; return; }
+    const uids = medicoSnap.data().meuspacientes || [];
+    if (!uids.length){ tbody.innerHTML = "<tr><td colspan='3'>Você ainda não tem pacientes.</td></tr>"; return; }
 
-        container.innerHTML = "";
-        for (const uidP of meuspacientes) {
-          const snapPac = await getDoc(doc(db,"pacientes",uidP));
-          if (!snapPac.exists()) continue;
-          const id = snapPac.data().identificacao?.[0] || {};
-          const div = document.createElement("div");
-          div.className="pasta";
-          div.textContent = `${id.nome||"Paciente"} ${id.sobrenome||""} (${id.idade||"--"} anos)`;
-          div.onclick = () => { localStorage.setItem("pacienteSelecionado",uidP); window.location.href="paciente_view.html"; };
-          container.appendChild(div);
-        }
-      } catch (e) {
-        console.error(e); container.innerHTML="<p>Erro ao carregar pacientes.</p>";
-      }
+    const dados = [];
+    for (const uid of uids){
+      const pSnap = await getDoc(doc(db,"pacientes",uid));
+      if (!pSnap.exists()) continue;
+      const id = pSnap.data().identificacao?.[0] || {};
+      dados.push({ uid, nome:id.nome||"", sobrenome:id.sobrenome||"", idade:id.idade||"--" });
     }
+    renderTabela(dados);
+  }catch(e){ console.error(e); tbody.innerHTML = "<tr><td colspan='3'>Erro ao carregar.</td></tr>"; }
+}
+
+function renderTabela(lista){
+  const tbody = document.querySelector("#tblPacientes tbody");
+  if(!lista.length){ tbody.innerHTML="<tr><td colspan='3'>Nenhum paciente.</td></tr>"; return; }
+
+  tbody.innerHTML = "";
+  for(const p of lista){
+    const tr = document.createElement("tr");
+    tr.innerHTML = `<td>${p.nome}</td><td>${p.sobrenome}</td><td style="text-align:center;">${p.idade}</td>`;
+    tr.onclick = ()=>{ localStorage.setItem("pacienteSelecionado",p.uid); window.location.href="paciente_view.html"; };
+    tbody.appendChild(tr);
+  }
+}
+
+/* ---- Filtro de busca ---- */
+document.getElementById("filtroPac").addEventListener("input", e=>{
+  const termo = e.target.value.toLowerCase();
+  [...document.querySelectorAll("#tblPacientes tbody tr")].forEach(tr=>{
+    tr.style.display = tr.textContent.toLowerCase().includes(termo) ? "" : "none";
+  });
+});
+
+/* ---- Ordenação por cabeçalho ---- */
+let sortDir = 1;   // 1 asc, -1 desc
+document.querySelectorAll("#tblPacientes th").forEach(th=>{
+  th.addEventListener("click", ()=>{
+    const col = th.dataset.col;
+    const rows = [...document.querySelectorAll("#tblPacientes tbody tr")];
+    rows.sort((a,b)=>{
+      const ta = a.children[th.cellIndex].textContent.trim().toLowerCase();
+      const tb = b.children[th.cellIndex].textContent.trim().toLowerCase();
+      return ta > tb ? sortDir : ta < tb ? -sortDir : 0;
+    });
+    sortDir *= -1;
+    rows.forEach(r=> r.parentElement.appendChild(r));
+  });
+});
 
     /* ---------- Modal controls ---------- */
     function abrirCalendario() {
