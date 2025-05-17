@@ -86,6 +86,8 @@
     const db  = getFirestore(app);
 
     const uidMedico = localStorage.getItem("uid");
+    const uidPacienteFix = localStorage.getItem("pacienteAgenda") || null;   // se vier da view do paciente
+    localStorage.removeItem("pacienteAgenda");     // limpa para a próxima vez
     if (!uidMedico) { alert("Médico não logado."); window.history.back(); }
 
     let pacientesMap = {};
@@ -99,49 +101,83 @@
     });
 
     async function carregarPacientes(){
-      const medSnap = await getDoc(doc(db,"medicos",uidMedico));
-      const uids = medSnap.data().meuspacientes||[];
-      const sel = document.getElementById("pacienteSelect");
-      sel.innerHTML = "<option value=''>-- Selecione --</option>";
-      for(const uid of uids){
-        const pSnap = await getDoc(doc(db,"pacientes",uid));
-        const id = pSnap.data().identificacao?.[0]||{};
-        const nome = `${id.nome||""} ${id.sobrenome||""}`.trim();
-        pacientesMap[uid]=nome;
-        const opt = document.createElement("option"); opt.value=uid; opt.textContent=nome;
-        sel.appendChild(opt);
+  const sel = document.getElementById("pacienteSelect");
+  pacientesMap = {};
+
+  /* modo paciente: só um UID fixo --------------------------------- */
+  if (uidPacienteFix){
+    const pSnap = await getDoc(doc(db,"pacientes",uidPacienteFix));
+    const id = pSnap.data().identificacao?.[0] || {};
+    const nome = `${id.nome||""} ${id.sobrenome||""}`.trim() || uidPacienteFix;
+    pacientesMap[uidPacienteFix] = nome;
+    sel.innerHTML = `<option value="${uidPacienteFix}">${nome}</option>`;
+    sel.disabled = true;                      // não deixa trocar
+    return [uidPacienteFix];                  // devolve lista única
+  }
+
+  /* modo médico normal --------------------------------------------- */
+  const medSnap = await getDoc(doc(db,"medicos",uidMedico));
+  const uids = medSnap.data().meuspacientes || [];
+  sel.innerHTML = "<option value=''>-- Selecione --</option>";
+  for(const uid of uids){
+    const pSnap = await getDoc(doc(db,"pacientes",uid));
+    const id = pSnap.data().identificacao?.[0]||{};
+    const nome = `${id.nome||""} ${id.sobrenome||""}`.trim();
+    pacientesMap[uid]=nome;
+    const opt = document.createElement("option");
+    opt.value=uid; opt.textContent=nome;
+    sel.appendChild(opt);
+  }
+  return uids;
+}
+function iniciarCalendar() {
+  const medRef = doc(db, "medicos", uidMedico);
+  getDoc(medRef).then(async snap => {
+    /* 1. pega todos os compromissos do médico */
+    let arr = snap.data().calendario || [];
+
+    /* 2. se veio da view do paciente, filtra só esse paciente */
+    if (uidPacienteFix) {
+      arr = arr.filter(ev => ev.uidPaciente === uidPacienteFix);
+    }
+
+    /* 3. mapeia para FullCalendar */
+    const events = arr.map(ev => ({
+      id: ev.id,
+      title: `${ev.titulo} – ${pacientesMap[ev.uidPaciente] || ""}`,
+      start: ev.dataHora,
+      extendedProps: ev
+    }));
+
+    /* 4. cria o calendário */
+    calendar = new FullCalendar.Calendar(
+      document.getElementById("calendar"), {
+        locale: "pt-br",
+        initialView: "dayGridMonth",
+        headerToolbar: {
+          left: 'prev,next today',
+          center: 'title addEvent',
+          right: ''
+        },
+        customButtons: {
+          addEvent: { text: 'Adicionar', click: () => openForm() }
+        },
+        events: events,
+        eventClick: info => openDetail(info.event)
+      });
+    calendar.render();
+
+    /* 5. se estamos no modo “um paciente”, esconde o seletor */
+    if (uidPacienteFix) {
+      const selEl = document.getElementById("pacienteSelect");
+      if (selEl) {
+        selEl.style.display = "none";
+        selEl.previousElementSibling?.style.setProperty("display", "none");
       }
     }
+  });
+}
 
-    function iniciarCalendar(){
-      const medRef = doc(db,"medicos",uidMedico);
-      getDoc(medRef).then(snap=>{
-        const arr = snap.data().calendario||[];
-        const events = arr.map(ev=>({
-          id: ev.id,
-          title:`${ev.titulo} – ${pacientesMap[ev.uidPaciente]||""}`,
-          start: ev.dataHora,
-          extendedProps: ev
-        }));
-
-        calendar = new FullCalendar.Calendar(
-          document.getElementById("calendar"),{
-          locale:"pt-br",
-          initialView:"dayGridMonth",
-          headerToolbar:{
-            left: 'prev,next today',
-            center: 'title addEvent',
-            right: ''
-          },
-          customButtons:{
-            addEvent:{ text:'Adicionar', click:()=> openForm() }
-          },
-          events: events,
-          eventClick: info=> openDetail(info.event)
-        });
-        calendar.render();
-      });
-    }
 
     /* FORM MODAL */
     const formModal = document.getElementById("modalForm");
@@ -164,8 +200,7 @@
     function clearForm(){ for(let k in dt) get(dt[k]).value = ''; }
 
     async function saveEvent(){
-      const uidP = get(dt.sel).value;
-      const d = get(dt.date).value;
+      const uidP = uidPacienteFix || get(dt.sel).value;      const d = get(dt.date).value;
       const t = get(dt.time).value;
       const ti= get(dt.title).value.trim();
       const lo= get(dt.loc).value.trim();

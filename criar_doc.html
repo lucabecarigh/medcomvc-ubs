@@ -249,25 +249,37 @@ const firebaseConfig = {
         arrayAtual.push(plainText);
         await updateDoc(docRef,{ [tipo]: arrayAtual });
 
-        /* PDF */
-        const agora   = new Date();
-        const data    = agora.toLocaleDateString("pt-BR").replace(/\//g,"-");
-        const hora    = agora.toTimeString().slice(0,5).replace(":","-");
-        const nomePDF = `${pacienteId}_${tipo}_${data}_${hora}_${medicoId}.pdf`;
+       /* PDF */
+const agora   = new Date();
+const dataBR  = agora.toLocaleDateString("pt-BR");      // 01/05/2025
+const data    = dataBR.replace(/\//g,"-");              // 01-05-2025
+const hora    = agora.toTimeString().slice(0,5).replace(":","-");
+const docId   = `${data}-${hora}`;                      // id humano-legível
+const nomePDF = `${pacienteId}_${tipo}_${docId}_${medicoId}.pdf`;
 
-        const wrapper = document.createElement("div");
-        wrapper.innerHTML = `<h1>Documento (${tipo})</h1>${htmlContent}`;
+/* ——— cabeçalho bonito + conteúdo original do TinyMCE ——— */
+const wrapper = document.createElement("div");
+wrapper.innerHTML = `
+  <header style="text-align:center;margin-bottom:20px;">
+    <h2 style="margin:0;">${tipo.charAt(0).toUpperCase()+tipo.slice(1)}</h2>
+    <p style="margin:0;font-size:14px;">
+      Paciente: <strong>${pacienteId}</strong> • ID&nbsp;${docId}
+    </p>
+    <hr style="margin-top:15px">
+  </header>
+  <div style="text-align:justify;">${htmlContent}</div>
+`;
 
-        const pdfBlob = await html2pdf().from(wrapper).set({
-          margin:1,
-          filename:nomePDF,
-          image:{ type:"jpeg",quality:0.98 },
-          html2canvas:{ scale:2 },
-          jsPDF:{ unit:"in", format:"a4", orientation:"portrait" }
-        }).outputPdf("blob");
+const pdfBlob = await html2pdf().from(wrapper).set({
+  margin: 1,
+  filename: nomePDF,
+  image: { type:"jpeg", quality:0.98 },
+  html2canvas: { scale: 2 },
+  jsPDF: { unit:"in", format:"a4", orientation:"portrait" }
+}).outputPdf("blob");
 
-        const storageRef = ref(storage,`pacientes/${pacienteId}/${tipo}/${nomePDF}`);
-        await uploadBytes(storageRef, pdfBlob);
+const storageRef = ref(storage, `pacientes/${pacienteId}/${tipo}/${nomePDF}`);
+await uploadBytes(storageRef, pdfBlob); 
 
         alert("Documento salvo com sucesso!");
         window.location.href = "paciente_view.html";

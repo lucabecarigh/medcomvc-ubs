@@ -85,8 +85,9 @@
     }
 
     function abrirCalendario() {
-      alert("Abrindo calendário do paciente: " + id);
-    }
+  localStorage.setItem("pacienteAgenda", id);   // passa o UID do paciente
+  window.location.href = "calendario.html";
+}
 
     function novoArquivo() {
       window.location.href = "criar_doc.html";

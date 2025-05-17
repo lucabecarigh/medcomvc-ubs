@@ -96,8 +96,10 @@
     }
 
     /* ---------- Modal controls ---------- */
-    function abrirCalendario(){ window.location.href = "calendario.html"; }
-    function abrirModalNovoPaciente(){ document.getElementById("modalNovoPaciente").style.display="flex"; }
+    function abrirCalendario() {
+  localStorage.removeItem("pacienteAgenda");   // garante modo “todas as consultas”
+  window.location.href = "calendario.html";
+}    function abrirModalNovoPaciente(){ document.getElementById("modalNovoPaciente").style.display="flex"; }
     function fecharModalNovoPaciente(){ document.getElementById("modalNovoPaciente").style.display="none"; }
 
     /* ---------- Salvar novo paciente ---------- */
