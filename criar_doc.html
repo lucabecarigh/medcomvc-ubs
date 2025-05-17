@@ -135,15 +135,7 @@ const firebaseConfig = {
     const medicoId   = localStorage.getItem("uid");
 
     /* ---------- OpenAI ---------- */
-    let OPENAI_API_KEY = localStorage.getItem("openaiApiKey") || "";
-    function pedirApiKey() {
-      if (OPENAI_API_KEY) return true;
-      const k = prompt("Digite sua OpenAI API Key (fica salva apenas neste navegador):");
-      if (!k) return false;
-      OPENAI_API_KEY = k.trim();
-      localStorage.setItem("openaiApiKey", OPENAI_API_KEY);
-      return true;
-    }
+   
 
     /* ---------- Prompt base Clinbot ---------- */
     const systemPrompt = `Você é um médico assistente inteligente. Avalie cuidadosamente a consulta abaixo e atue como apoio clínico.
@@ -322,8 +314,6 @@ await uploadBytes(storageRef, pdfBlob);
         return;
       }
 
-      /* API Key */
-      if (!pedirApiKey()) return;
 
       /* Monta mensagens */
       conversation.length = 0; // zera
@@ -353,27 +343,13 @@ await uploadBytes(storageRef, pdfBlob);
       conversaLog("assistant", "⏳ Pensando...");
 
       try {
-        const resposta = await fetch("https://api.openai.com/v1/chat/completions", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "Authorization": `Bearer ${OPENAI_API_KEY}`
-          },
-          body: JSON.stringify({
-            model: "gpt-4.1",
-            messages: [
-              { role:"system", content: systemPrompt },
-              ...conversation
-            ],
-            temperature: 0.7
-          })
-        });
+        const resposta = await fetch("http://127.0.0.1:8000/clinbot/", {  method: "POST",
+  headers: { "Content-Type":"application/json" },
+  body: JSON.stringify({ mensagem: conversation[0].content })
+});
+const data = await resposta.json();
+const respostaBruta = data.reply.trim();
 
-        const data = await resposta.json();
-        if (data.error) throw new Error(data.error.message || "Erro da API");
-
-        /* Atualiza último "Pensando..." preservando formatação */
-const respostaBruta = data.choices[0].message.content.trim();
 chatDiv.lastChild.innerHTML = "🤖 " + formatAssistant(respostaBruta);
 conversation.push({ role:"assistant", content: respostaBruta });
 
