@@ -13,11 +13,8 @@
   <style>
     body             { background:#f2f6f8; padding:20px; font-family:sans-serif; }
     h1               { text-align:center; }
-/* garante que o editor fique atrás do modal */
-    #editor-container {
-    position: relative;
-    z-index: 1;
-  }    
+    /* garante que o editor fique atrás do modal */
+    #editor-container { position: relative; z-index: 1; }    
     textarea#editor  { min-height:500px; }
 
     .center          { text-align:center; margin-bottom:20px; }
@@ -31,6 +28,14 @@
     #clinbotChat .assistant { color:#198754; }
     #clinbotQuestion { width:100%; max-width:1000px; height:80px; margin:10px auto;
                        display:block; padding:10px; }
+
+    /* Painel lateral de transcrição */
+    .side-panel{
+      position:fixed; right:0; top:0; width:340px; height:100%; background:#fff;
+      border-left:2px solid #ccc; padding:15px; overflow-y:auto;
+      box-shadow:-2px 0 5px rgba(0,0,0,0.1); z-index:2;
+    }
+    .side-panel h3{margin-top:0; text-align:center;}
   </style>
 </head>
 
@@ -62,8 +67,6 @@
     </select>
   </div>
 
-
-
   <!-- TinyMCE -->
   <div id="editor-container">
     <textarea id="editor"></textarea>
@@ -71,9 +74,17 @@
 
 <!-- Gravador de áudio -->
 <div class="center" id="audioControls">
-  <button id="recordBtn" onclick="iniciarGravacao()">🎙️ Gravar consulta</button>
-  <button id="stopBtn"   onclick="pararGravacao()" hidden>⏹️ Parar</button>
+  <button id="recordBtn"  onclick="iniciarGravacao()">🎙️ Gravar consulta</button>
+  <button id="pauseBtn"   onclick="pausarGravacao()"  hidden>⏸️ Pausar</button>
+  <button id="resumeBtn"  onclick="retomarGravacao()" hidden>▶️ Retomar</button>
+  <button id="stopBtn"    onclick="pararGravacao()"  hidden>⏹️ Parar</button>
   <span   id="tempoLabel"></span>
+</div>
+
+<!-- Painel lateral de transcrição -->
+<div id="transcribePanel" class="side-panel" hidden>
+  <h3>Transcrição em Tempo Real</h3>
+  <div id="transcriptionContent"></div>
 </div>
 
   <!-- Botões principais -->
@@ -81,16 +92,8 @@
     <button onclick="salvarDocumento()">💾 Salvar</button>
     <button onclick="clinbotPrimeiraAnalise()">🤖 Clinbot</button>
     <button onclick="voltar()">🔙 Voltar</button>
-    <button
-  onclick="window.open('./MedUtis/index.html', '_blank')"  
-  style="margin:5px; padding:8px 15px;"
->
-  💊 med.utis
-    </button>
-
+    <button onclick="window.open('./MedUtis/index.html', '_blank')" style="margin:5px; padding:8px 15px;">💊 med.utis</button>
   </div>
-
-  
 
   <!-- Área de chat / respostas -->
   <div id="clinbotChat" hidden></div>
@@ -154,9 +157,12 @@ const firebaseConfig = {
     const conversation = []; // {role:"user"/"assistant", content:"..."}
 
     /* ---------- Áudio / Transcrição ---------- */
-    let mediaRecorder = null;
-    let audioChunks   = [];
-    let cronometro    = null;
+    let mediaRecorder   = null;
+    let isPaused        = false;
+    let cronometro      = null;
+    let transcriptChunks = [];   // Armazena todos os textos já transcritos
+    let audioBuffer     = [];    // Buffer em tempo real para o último chunk
+    let soapTimeout     = null;  // Usado para garantir 1 chamada SOAP por chunk
 
     /* ---------- TinyMCE ---------- */
     tinymce.init({
@@ -370,85 +376,133 @@ const firebaseConfig = {
     /* ---------- Voltar ---------- */
     window.voltar = () => window.location.href = "paciente_view.html";
 
-    /* ================================================================= */
-    /* ===            ÁUDIO  –  GRAVAR • TRANSCRIBIR • SOAP           === */
-    /* ================================================================= */
+/* ================================================================= */
+/* ===            ÁUDIO  –  GRAVAR • TRANSCRIBIR • SOAP           === */
+/* ================================================================= */
 
-    /* ---------- Iniciar gravação ---------- */
-    window.iniciarGravacao = async function () {
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({ audio:true });
-        audioChunks  = [];
-        mediaRecorder = new MediaRecorder(stream, { mimeType:"audio/webm" });
+/* ---------- Iniciar gravação ---------- */
+let chunkTimer      = null;   // reinicia a cada 3 s
+let currentSeconds  = 0;
 
-        mediaRecorder.ondataavailable = e => audioChunks.push(e.data);
-        mediaRecorder.onstop          = processarGravacao;
+/* trata cada blob recebido */
+async function processBlob(blob){
+  const texto = await transcreverAudio(blob);
+  if (!texto) return;
 
-        mediaRecorder.start();
-        document.getElementById("recordBtn").hidden = true;
-        document.getElementById("stopBtn").hidden   = false;
+  /* mostra bloco no topo da aba lateral */
+  const painel = document.getElementById("transcriptionContent");
+  const bloco  = document.createElement("p");
+  bloco.textContent = texto.trim();
+  painel.insertBefore(bloco, painel.firstChild);
+  painel.scrollTop = 0;
 
-        /* cronômetro */
-        const label = document.getElementById("tempoLabel");
-        let segundos = 0;
-        cronometro = setInterval(() => {
-          segundos++;
-          const min = String(Math.floor(segundos/60)).padStart(2,"0");
-          const seg = String(segundos%60).padStart(2,"0");
-          label.textContent = `${min}:${seg}`;
-        }, 1000);
+  /* acumula e gera SOAP */
+  transcriptChunks.push(texto.trim());
+  const soap = await gerarNotaSOAP(transcriptChunks.join(" "));
+  if (soap) tinymce.get("editor")
+                   .setContent(`<pre style="white-space:pre-wrap;">${soap}</pre>`);
+}
 
-      } catch (err) {
-        console.error("Permissão negada:", err);
-        alert("Não foi possível acessar o microfone.");
-      }
-    };
+window.iniciarGravacao = async () => {
+  try{
+    const stream   = await navigator.mediaDevices.getUserMedia({ audio:true });
+    const mimeType = MediaRecorder.isTypeSupported("audio/webm;codecs=opus")
+                     ? "audio/webm;codecs=opus" : "audio/ogg;codecs=opus";
+    mediaRecorder  = new MediaRecorder(stream,{ mimeType });
 
-
-    
-    /* ---------- Parar gravação ---------- */
-    window.pararGravacao = function () {
-      if (mediaRecorder && mediaRecorder.state !== "inactive") mediaRecorder.stop();
-      clearInterval(cronometro);
-      document.getElementById("tempoLabel").textContent = "";
-      document.getElementById("recordBtn").hidden = false;
-      document.getElementById("stopBtn").hidden   = true;
-    };
-
-    /* ---------- Processar gravação ---------- */
-    async function processarGravacao() {
-      const blob      = new Blob(audioChunks, { type:"audio/webm" });
-      const filename  = `consulta_${Date.now()}.webm`;
-
-      /* Salva áudio bruto (opcional) */
-      try {
-        const audioRef = ref(storage, `pacientes/${pacienteId}/audio/${filename}`);
-        await uploadBytes(audioRef, blob);
-      } catch (e) {
-        console.warn("Falha ao enviar áudio:", e);
-      }
-
-      /* Transcreve com Whisper */
-      const textoTranscrito = await transcreverAudio(blob);
-      if (!textoTranscrito) { alert("Erro na transcrição."); return; }
-
-      /* Gera nota SOAP com GPT‑4 */
-      const soapNote = await gerarNotaSOAP(textoTranscrito);
-      if (!soapNote) { alert("Erro ao gerar nota SOAP."); return; }
-
-      /* Coloca no editor */
-      tinymce.get("editor").setContent(`<pre style="white-space:pre-wrap;">${soapNote}</pre>`);
-      alert("Transcrição concluída e nota SOAP gerada!");
+    /* reinicia o gravador a cada 10 s para garantir cabeçalho válido */
+    function startCycle(){
+      mediaRecorder.start();
+      chunkTimer = setTimeout(()=>{
+        if(!isPaused) mediaRecorder.stop();      // dispara ondataavailable
+      },10000);
     }
+
+    mediaRecorder.ondataavailable = e=>{
+      if(e.data && e.data.size && !isPaused) processBlob(e.data);
+    };
+
+    mediaRecorder.onstop = ()=>{
+      if(!isPaused) startCycle();                // novo ciclo contínuo
+    };
+
+    /* -------- UI -------- */
+    document.getElementById("recordBtn").hidden  = true;
+    document.getElementById("stopBtn").hidden    = false;
+    document.getElementById("pauseBtn").hidden   = false;
+    document.getElementById("resumeBtn").hidden  = true;
+    document.getElementById("transcribePanel").hidden = false;
+    document.getElementById("transcriptionContent").innerHTML = "";
+    transcriptChunks.length = 0;
+
+    /* cronômetro */
+    currentSeconds = 0;
+    const label = document.getElementById("tempoLabel");
+    cronometro = setInterval(()=>{
+      currentSeconds++;
+      label.textContent =
+        `${String(Math.floor(currentSeconds/60)).padStart(2,"0")}:`+
+        `${String(currentSeconds%60).padStart(2,"0")}`;
+    },1000);
+
+    startCycle();                                // inicia gravação
+
+  }catch(err){
+    console.error(err);
+    alert("Não foi possível acessar o microfone.");
+  }
+};
+
+/* ---------- Pausar ---------- */
+window.pausarGravacao = () => {
+  if(!mediaRecorder || mediaRecorder.state!=="recording") return;
+  isPaused = true;
+  clearTimeout(chunkTimer);
+  mediaRecorder.stop();
+  document.getElementById("pauseBtn").hidden  = true;
+  document.getElementById("resumeBtn").hidden = false;
+};
+
+/* ---------- Retomar ---------- */
+window.retomarGravacao = () => {
+  if(!mediaRecorder || !isPaused) return;
+  isPaused = false;
+  mediaRecorder.start();
+  chunkTimer = setTimeout(()=>{ mediaRecorder.stop(); },3000);
+  document.getElementById("pauseBtn").hidden  = false;
+  document.getElementById("resumeBtn").hidden = true;
+};
+
+/* ---------- Parar gravação ---------- */
+window.pararGravacao = () => {
+  clearTimeout(chunkTimer);
+  if(mediaRecorder && mediaRecorder.state!=="inactive") mediaRecorder.stop();
+  finalizarGravacao();
+};
+
+/* ---------- Finalizar gravação (stop) ---------- */
+async function finalizarGravacao(){
+  clearInterval(cronometro);
+  document.getElementById("tempoLabel").textContent = "";
+  document.getElementById("recordBtn").hidden  = false;
+  document.getElementById("stopBtn").hidden    = true;
+  document.getElementById("pauseBtn").hidden   = true;
+  document.getElementById("resumeBtn").hidden  = true;
+  document.getElementById("transcribePanel").hidden = true;
+
+  if(transcriptChunks.length){
+    const soap = await gerarNotaSOAP(transcriptChunks.join(" "));
+    if(soap) tinymce.get("editor")
+                   .setContent(`<pre style="white-space:pre-wrap;">${soap}</pre>`);
+    alert("Transcrição concluída e nota SOAP gerada!");
+  }
+}
 
     /* ---------- Transcrição via backend ---------- */
 async function transcreverAudio(blob) {
   const formData = new FormData();
-  formData.append(
-    "file",
-    new File([blob], "consulta.webm", { type: "audio/webm" })
-  );
-
+  const ext  = blob.type.includes("ogg") ? "ogg" : "webm";
+formData.append("file", new File([blob], `chunk.${ext}`, { type: blob.type }));
   try {
     const resp = await fetch("http://127.0.0.1:8000/transcribe/", {
       method: "POST",
@@ -465,38 +519,22 @@ async function transcreverAudio(blob) {
 
     /* ---------- Geração da nota SOAP ---------- */
     async function gerarNotaSOAP(transcricao) {
-      const promptSOAP = `
-Você é um médico de família experiente. 
-Com base na transcrição de consulta a seguir, produza um prontuário completo no formato **SOAP**,
-usando terminologia médica precisa e atualizada, contemplando:
+      const promptSOAP = `\nVocê é um médico de família experiente.\nCom base na transcrição de consulta a seguir, produza um prontuário completo no formato **SOAP**,\nusando terminologia médica precisa e atualizada, contemplando:\n\n• **S (Subjective)** – queixa principal, HDA, antecedentes, medicações, alergias, revisão de sistemas resumida.  \n• **O (Objective)** – sinais vitais, exame físico (sistematizado), exames complementares disponíveis.  \n• **A (Assessment)** – diagnóstico(s) diferencial(is) e principal(is) com raciocínio breve.  \n• **P (Plan)** – plano diagnóstico, terapêutico, educacional, rastreamento, follow‑up, retorno ou referência.  \n\nInclua tópicos de prevenção, guidelínes recentes e códigos CID‑10 se cabíveis.  \nNão invente dados; se algo não foi dito, registre como *“Não avaliado”*.\n\nTranscrição:\n"""${transcricao}"""\n`;
 
-• **S (Subjective)** – queixa principal, HDA, antecedentes, medicações, alergias, revisão de sistemas resumida.  
-• **O (Objective)** – sinais vitais, exame físico (sistematizado), exames complementares disponíveis.  
-• **A (Assessment)** – diagnóstico(s) diferencial(is) e principal(is) com raciocínio breve.  
-• **P (Plan)** – plano diagnóstico, terapêutico, educacional, rastreamento, follow‑up, retorno ou referência.  
-
-Inclua tópicos de prevenção, guidelínes recentes e códigos CID‑10 se cabíveis.  
-Não invente dados; se algo não foi dito, registre como *“Não avaliado”*.
-
-Transcrição:
-"""${transcricao}"""
-`;
-
-try {
-    const resp = await fetch("http://127.0.0.1:8000/summarize/", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ transcript: transcricao }),
-    });
-    if (!resp.ok) throw new Error(await resp.text());
-    const data = await resp.json();
-    return data.soap || null;
-  } catch (e) {
-    console.error("Erro ao gerar SOAP:", e);
-    return null;
-  }
+      try {
+        const resp = await fetch("http://127.0.0.1:8000/summarize/", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ transcript: transcricao }),
+        });
+        if (!resp.ok) throw new Error(await resp.text());
+        const data = await resp.json();
+        return data.soap || null;
+      } catch (e) {
+        console.error("Erro ao gerar SOAP:", e);
+        return null;
+      }
     }
-    
 
   </script>
 
