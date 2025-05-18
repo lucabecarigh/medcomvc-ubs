@@ -140,6 +140,7 @@ const firebaseConfig = {
     const conversation = []; // {role:"user"/"assistant", content:"..."}
 
     /* ---------- Áudio / Transcrição ---------- */
+    let recordingDone = false;
     let mediaRecorder   = null;
     let isPaused        = false;
     let cronometro      = null;
@@ -147,6 +148,63 @@ const firebaseConfig = {
     let keepCycling = false;      // controla se deve continuar gerando blobs
     let audioBuffer     = [];    // Buffer em tempo real para o último chunk
     let soapTimeout     = null;  // Usado para garantir 1 chamada SOAP por chunk
+
+/* === formato bonito para a resposta do Clinbot === */
+function formatAssistant(t){
+  // negrito: **texto** → <strong>texto</strong>
+  t = t.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
+
+  // sublinhado: *texto* → <u>texto</u>
+  t = t.replace(/\*(?!\*)([^*]+?)\*(?!\*)/g, "<u>$1</u>");
+
+  const lines = t.split(/\r?\n/);
+  let html = "", list=null;            // list = null | 'ul' | 'ol'
+
+  const closeList = () => { if(list){ html += `</${list}>`; list=null;} };
+
+  for (let raw of lines){
+    const line = raw.trim();
+    if(!line){ closeList(); continue; }
+
+    /* ------------ separador "---" ------------------------- */
+    if (/^---+$/.test(line)){ closeList(); html += "<hr>"; continue; }
+
+/* ------------ cabeçalhos via negrito inteiro ------------------------------ */
+// toda linha que for apenas **texto** vira <h3>texto</h3>
+if (/^<strong>.*<\/strong>$/.test(line)) {
+  closeList();
+  html += `<h3>${line.replace(/^<strong>|<\/strong>$/g,"")}</h3>`;
+  continue;
+}
+/* ------------ cabeçalhos markdown ## / ### ------------------------------ */
+if (/^##\s+/.test(line) || /^###\s+/.test(line)) {
+  closeList();
+  const lvl = line.startsWith("###") ? "h4" : "h3";
+  html += `<${lvl}>${line.replace(/^###?\s+/,"")}</${lvl}>`;
+  continue;
+}
+
+    /* ------------ bullet list "- " ----------------------- */
+    if (/^\-\s+/.test(line)){
+      if(list!=="ul"){ closeList(); html+="<ul>"; list="ul"; }
+      html += `<li>${line.slice(2).trim()}</li>`;
+      continue;
+    }
+
+    /* ------------ numbered list "1. " -------------------- */
+    if (/^\d+\.\s+/.test(line)){
+      if(list!=="ol"){ closeList(); html+="<ol>"; list="ol"; }
+      html += `<li>${line.replace(/^\d+\.\s+/,"")}</li>`;
+      continue;
+    }
+
+    /* ------------ parágrafo normal ----------------------- */
+    closeList();
+    html += `<p>${line}</p>`;
+  }
+  closeList();
+  return html;
+}
 
     /* ---------- TinyMCE ---------- */
     tinymce.init({
@@ -359,60 +417,7 @@ function conversaLog(role, texto){
   chatDiv.scrollTop = chatDiv.scrollHeight;
 }
 
-/* === formato bonito para a resposta do Clinbot === */
-function formatAssistant(t){
-  // negrito: **texto** → <strong>texto</strong>
-  t = t.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
 
-  // sublinhado: *texto* → <u>texto</u>
-  t = t.replace(/\*(?!\*)([^*]+?)\*(?!\*)/g, "<u>$1</u>");
-
-  const lines = t.split(/\r?\n/);
-  let html = "", list=null;            // list = null | 'ul' | 'ol'
-
-  const closeList = () => { if(list){ html += `</${list}>`; list=null;} };
-
-  for (let raw of lines){
-    const line = raw.trim();
-    if(!line){ closeList(); continue; }
-
-    /* ------------ separador "---" ------------------------- */
-    if (/^---+$/.test(line)){ closeList(); html += "<hr>"; continue; }
-
-    /* ------------ cabeçalhos ------------------------------ */
-    if (/^<strong>.+?:<\/strong>$/.test(line)){        // **Titulo:**
-      closeList();
-      html += `<h3>${line.replace(/^<strong>|<\/strong>:?$/g,"")}</h3>`;
-      continue;
-    }
-    if (/^##\s+/.test(line) || /^###\s+/.test(line)){
-      closeList();
-      const lvl = line.startsWith("###") ? "h4" : "h3";
-      html += `<${lvl}>${line.replace(/^###?\s+/,"")}</${lvl}>`;
-      continue;
-    }
-
-    /* ------------ bullet list "- " ----------------------- */
-    if (/^\-\s+/.test(line)){
-      if(list!=="ul"){ closeList(); html+="<ul>"; list="ul"; }
-      html += `<li>${line.slice(2).trim()}</li>`;
-      continue;
-    }
-
-    /* ------------ numbered list "1. " -------------------- */
-    if (/^\d+\.\s+/.test(line)){
-      if(list!=="ol"){ closeList(); html+="<ol>"; list="ol"; }
-      html += `<li>${line.replace(/^\d+\.\s+/,"")}</li>`;
-      continue;
-    }
-
-    /* ------------ parágrafo normal ----------------------- */
-    closeList();
-    html += `<p>${line}</p>`;
-  }
-  closeList();
-  return html;
-}
 
     /* ---------- Voltar ---------- */
     window.voltar = () => window.location.href = "paciente_view.html";
@@ -427,6 +432,7 @@ let currentSeconds  = 0;
 
 /* trata cada blob recebido */
 async function processBlob(blob){
+  if (recordingDone) return;          // <— se já finalizei, ignora
   const texto = await transcreverAudio(blob);
   if (!texto) return;
 
@@ -525,18 +531,27 @@ window.pararGravacao = () => {
 
 /* ---------- Finalizar gravação (stop) ---------- */
 async function finalizarGravacao(){
+  recordingDone = true;
+  // Para de reiniciar ciclos
+  keepCycling = false;
+  // pára o cronômetro
   clearInterval(cronometro);
   document.getElementById("tempoLabel").textContent = "";
+  // restaura botões
   document.getElementById("recordBtn").hidden  = false;
   document.getElementById("stopBtn").hidden    = true;
   document.getElementById("pauseBtn").hidden   = true;
   document.getElementById("resumeBtn").hidden  = true;
   document.getElementById("transcribePanel").hidden = true;
 
-  if(transcriptChunks.length){
+  if (transcriptChunks.length) {
+    // Gera a última versão SOAP
     const soap = await gerarNotaSOAP(transcriptChunks.join(" "));
-    if(soap) tinymce.get("editor")
-                   .setContent(`<pre style="white-space:pre-wrap;">${soap}</pre>`);
+    if (soap) {
+      // Formata com HTML bonito
+      const html = formatAssistant(soap);
+      tinymce.get("editor").setContent(html);
+    }
     alert("Transcrição concluída e nota SOAP gerada!");
   }
 }
