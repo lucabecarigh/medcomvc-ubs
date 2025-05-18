@@ -134,22 +134,7 @@ const firebaseConfig = {
     const pacienteId = localStorage.getItem("pacienteSelecionado");
     const medicoId   = localStorage.getItem("uid");
 
-    /* ---------- OpenAI ---------- */
-   
-
-    /* ---------- Prompt base Clinbot ---------- */
-    const systemPrompt = `Você é um médico assistente inteligente. Avalie cuidadosamente a consulta abaixo e atue como apoio clínico.
-
-1. Leia o conteúdo da consulta e faça uma análise detalhada e organizada na sua memória.
-2. Avalie o que falta na anamnese, revisão de sistemas, exame físico ou plano.
-3. Proponha hipóteses diagnósticas prováveis caso ainda não tenham sido.
-4. Sugira exames complementares relevantes, scores e uma possível conduta/resumo do plano clínico caso seja necessário.
-5. Comente se há rastreios pendentes, atualizações de vacina, necessidade de retorno ou referência.
-6. Escreva de forma empática e direta, como um colega médico experiente que está ajudando na consulta, mas sem excessos.
-7. Baseie‑se sempre nas melhores práticas médicas e evidências confiáveis.
-8. Busque sempre na web atualizações além do seu conhecimento prévio para estarmos sempre atualizados.
-9. Baseie-se apenas nas melhores fontes e diretrizes, sempre atualizadas com as melhores práticas.
-10. Sempre cite as fontes das informações.`;
+    
 
     /* ---------- Histórico de conversa (Clinbot) ---------- */
     const conversation = []; // {role:"user"/"assistant", content:"..."}
@@ -577,8 +562,6 @@ formData.append("file", new File([blob], `chunk.${ext}`, { type: blob.type }));
 
     /* ---------- Geração da nota SOAP ---------- */
     async function gerarNotaSOAP(transcricao) {
-      const promptSOAP = `\nVocê é um médico de família experiente.\nCom base na transcrição de consulta a seguir, produza um prontuário completo no formato **SOAP**,\nusando terminologia médica precisa e atualizada, contemplando:\n\n• **S (Subjective)** – queixa principal, HDA, antecedentes, medicações, alergias, revisão de sistemas resumida.  \n• **O (Objective)** – sinais vitais, exame físico (sistematizado), exames complementares disponíveis.  \n• **A (Assessment)** – diagnóstico(s) diferencial(is) e principal(is) com raciocínio breve.  \n• **P (Plan)** – plano diagnóstico, terapêutico, educacional, rastreamento, follow‑up, retorno ou referência.  \n\nInclua tópicos de prevenção, guidelínes recentes e códigos CID‑10 se cabíveis.  \nNão invente dados; se algo não foi dito, registre como *“Não avaliado”*.\n\nTranscrição:\n"""${transcricao}"""\n`;
-
       try {
         const resp = await fetch("http://127.0.0.1:8000/summarize/", {
           method: "POST",
