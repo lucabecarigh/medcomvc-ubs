@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Enfermagem - Triagem</title>
+  <link rel="stylesheet" href="style.css"/>
+  <style>
+    /* Estilos para lista de triagem */
+    #fila-triagem { padding: 0; margin: 20px 0; }
+    #fila-triagem li { list-style: none; margin: 8px 0; padding: 10px; background: #fff;
+                       border-radius: 4px; cursor: pointer; display: flex; align-items: center;
+                       box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+    .indicator { width: 8px; height: 100%; margin-right: 12px; border-radius: 2px; }
+    .item-content { flex: 1; }
+    .item-title { font-weight: bold; }
+    .item-class { margin-left: auto; font-size: 0.9em; color: #333; }
+  </style>
+</head>
+<body>
+  <h1>🩺 Triagem – Enfermagem</h1>
+
+  <!-- Lista de pacientes triados, ordenada por cor e chegada -->
+  <ul id="fila-triagem"></ul>
+
+  <div class="center">
+    <button onclick="window.location.href='triagem.html'">
+      ➕ Triar novo paciente
+    </button>
+  </div>
+
+  <script type="module">
+    import { app, db } from './firebase-config.js';
+    import { collection, getDocs } from 'https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js';
+
+    // mapeamento de cores para prioridade e CSS
+    const priority = { Vermelho:0, Laranja:1, Amarelo:2, Verde:3, Azul:4 };
+    const colorMap = { Vermelho:'red', Laranja:'orange', Amarelo:'yellow', Verde:'green', Azul:'blue' };
+
+    async function carregarFila() {
+      const ul = document.getElementById('fila-triagem');
+      ul.innerHTML = '';
+      const snap = await getDocs(collection(db, 'triagemQueue'));
+      const docs = [];
+      snap.forEach(d => docs.push({ id:d.id, ...d.data() }));
+
+      // ordena primeiro por cor, depois por data de chegada
+      docs.sort((a,b) => {
+        const aRaw = a.classificacao || 'Azul';
+        const bRaw = b.classificacao || 'Azul';
+        const aColor = aRaw.split('(')[0].trim();
+        const bColor = bRaw.split('(')[0].trim();
+        const pa = priority[aColor] ?? 5;
+        const pb = priority[bColor] ?? 5;
+        if (pa !== pb) return pa - pb;
+        const da = new Date(a.chegada).getTime();
+        const dbt = new Date(b.chegada).getTime();
+        return da - dbt;
+      });
+
+      docs.forEach(item => {
+        // Safe color fallback
+        const raw = item.classificacao || 'Azul';
+        const colorKey = raw.split('(')[0].trim();
+        const cssColor = colorMap[colorKey] || colorMap['Azul'];
+
+        const li = document.createElement('li');
+        li.style.borderLeft = `6px solid ${cssColor}`;
+
+        // indicador de cor
+        const ind = document.createElement('div');
+        ind.className = 'indicator';
+        ind.style.backgroundColor = cssColor;
+
+        // conteúdo
+        const cont = document.createElement('div');
+        cont.className = 'item-content';
+        const classText = item.classificacao || 'Não classificado';
+        cont.innerHTML = `<span class="item-title">${item.nomePaciente || item.pacienteId}</span>\n` +
+                         `<div class="item-class">${classText}</div>`;
+
+        // hora de chegada
+        const hora = document.createElement('div');
+        hora.className = 'item-sub';
+        hora.textContent = item.chegada.replace('T',' ');
+
+        li.append(ind, cont, hora);
+        li.addEventListener('click', () => {
+          // TODO: navegar para detalhes do paciente triado
+          console.log('Clicou em triagem', item.id);
+        });
+
+        ul.appendChild(li);
+      });
+    }
+
+    window.addEventListener('load', carregarFila);
+  </script>
+</body>
+</html>

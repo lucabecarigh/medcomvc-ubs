@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Triagem de Paciente</title>
+  <link rel="stylesheet" href="style.css"/>
+  <style>
+    /* Reutilize estilos de criar_doc.html conforme necessário */
+    body { background:#f2f6f8; padding:20px; font-family:sans-serif; }
+    h1 { text-align:center; }
+    .center { text-align:center; margin-bottom:20px; }
+    select,button { margin:5px; padding:8px 15px; }
+    .side-panel{ position:fixed; right:0; top:0; width:340px; height:100%; background:#fff;
+      border-left:2px solid #ccc; padding:15px; overflow-y:auto;
+      box-shadow:-2px 0 5px rgba(0,0,0,0.1); z-index:2;
+    }
+    .side-panel h3{margin-top:0; text-align:center;}
+    .form-group { margin-bottom: 15px; }
+    .form-group label { display: block; font-weight: bold; margin-bottom: 5px; }
+    .form-group input,
+    .form-group textarea,
+    .form-group select { width: 100%; padding: 6px 8px; box-sizing: border-box; }
+  </style>
+</head>
+<body>
+  <h1>📋 Triagem de Paciente</h1>
+
+  <form id="triagemForm">
+    <div class="form-group">
+      <label for="selecPaciente">Paciente</label>
+      <select id="selecPaciente" name="selecPaciente" required>
+        <option value="">Selecione paciente</option>
+        <option value="__novo__">+ Novo paciente...</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label for="dataChegada">Data e Hora de Chegada</label>
+      <input type="datetime-local" id="dataChegada" name="dataChegada" required/>
+    </div>
+    <div class="form-group">
+      <label for="queixaPrincipal">Queixa Principal</label>
+      <textarea id="queixaPrincipal" name="queixaPrincipal" required></textarea>
+    </div>
+    <div class="form-group">
+      <label for="pa">PA (mmHg)</label>
+      <input type="text" id="pa" name="pa" required/>
+    </div>
+    <div class="form-group">
+      <label for="fc">FC (bpm)</label>
+      <input type="number" id="fc" name="fc" required/>
+    </div>
+    <div class="form-group">
+      <label for="fr">FR (irpm)</label>
+      <input type="number" id="fr" name="fr" required/>
+    </div>
+    <div class="form-group">
+      <label for="temp">Temperatura (°C)</label>
+      <input type="number" step="0.1" id="temp" name="temp" required/>
+    </div>
+    <div class="form-group">
+      <label for="sato2">SatO₂ (%)</label>
+      <input type="number" min="0" max="100" id="sato2" name="sato2" required/>
+    </div>
+    <div class="form-group">
+      <label for="nivelConsciencia">Nível de Consciência (AVPU)</label>
+      <select id="nivelConsciencia" name="nivelConsciencia" required>
+        <option value="">Selecione</option>
+        <option value="Alert">Alert</option>
+        <option value="Voice">Voice</option>
+        <option value="Pain">Pain</option>
+        <option value="Unresponsive">Unresponsive</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label for="dor">Escala de Dor (0-10)</label>
+      <input type="number" min="0" max="10" id="dor" name="dor" required/>
+    </div>
+    <div class="form-group">
+      <label for="classificacao">Classificação</label>
+      <input type="text" id="classificacao" name="classificacao" disabled/>
+    </div>
+  </form>
+
+  <!-- Controles de áudio / transcrição -->
+  <div class="center" id="audioControls">
+    <!-- Utilize os mesmos botões de gravação de criar_doc.html -->
+  </div>
+  <div id="transcribePanel" class="side-panel" hidden>
+    <h3>Transcrição</h3>
+    <div id="transcriptionContent"></div>
+  </div>
+
+  <!-- Botões principais -->
+  <div class="center">
+    <button onclick="salvarTriagem()">💾 Salvar Triagem</button>
+    <button onclick="clinbotTriagem()">🤖 Classifique</button>
+    <button onclick="window.location.href='enfermagem.html'">🔙 Voltar</button>
+  </div>
+
+  <div id="clinbotChat" hidden></div>
+
+  <!-- Lógica de Firebase e Clinbot -->
+  <script type="module">
+    // importa configuração e instâncias já inicializadas
+    import { app, db } from './firebase-config.js';
+    import { collection, addDoc, getDocs, doc, setDoc } from 'https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js';
+
+    // preenche lista de pacientes e data de chegada
+    document.addEventListener('DOMContentLoaded', async () => {
+      // carrega pacientes
+      const selec = document.getElementById('selecPaciente');
+      const snap = await getDocs(collection(db, 'pacientes'));
+      snap.forEach(d => {
+        const opt = document.createElement('option');
+        opt.value = d.id;
+        opt.textContent = d.data().nome || d.id;
+        selec.appendChild(opt);
+      });
+      // data chegada
+      document.getElementById('dataChegada').value = new Date().toISOString().slice(0,16);
+
+      selec.addEventListener('change', async () => {
+        if (selec.value === '__novo__') {
+          const nome = prompt('Digite o nome do novo paciente:');
+          if (nome) {
+            const novoRef = doc(db, 'pacientes', nome.replace(/\s+/g,'_').toLowerCase());
+            await setDoc(novoRef, { nome });
+            const newOpt = new Option(nome, novoRef.id, true, true);
+            selec.insertBefore(newOpt, selec.firstChild.nextSibling);
+          } else {
+            selec.value = '';
+          }
+        }
+      });
+    });
+
+    // chama backend FastAPI para triagem
+    async function clinbotTriagem() {
+      const f = document.getElementById('triagemForm');
+      if (!f.reportValidity()) return;
+      const dados = {
+        pacienteId: f.selecPaciente.value,
+        chegada: f.dataChegada.value,
+        queixaPrincipal: f.queixaPrincipal.value,
+        sinaisVitais: {
+          pa: f.pa.value,
+          fc: f.fc.value,
+          fr: f.fr.value,
+          temp: f.temp.value,
+          sato2: f.sato2.value
+        },
+        nivelConsciencia: f.nivelConsciencia.value,
+        escalaDor: f.dor.value
+      };
+      try {
+        const resp = await fetch('http://127.0.0.1:8000/triagem/', {
+          method: 'POST', headers: {'Content-Type':'application/json'},
+          body: JSON.stringify({ mensagem: JSON.stringify(dados) })
+        });
+        const { reply } = await resp.json();
+        document.getElementById('classificacao').value = reply;
+      } catch (e) {
+        console.error(e);
+        alert('Erro ao gerar classificação.');
+      }
+    }
+    window.clinbotTriagem = clinbotTriagem;
+
+    // salva triagem no Firestore e retorna à fila
+    async function salvarTriagem() {
+      const f = document.getElementById('triagemForm');
+      if (!f.reportValidity()) return;
+      try {
+        await addDoc(collection(db, 'triagemQueue'), {
+          pacienteId: f.selecPaciente.value,
+          chegada: f.dataChegada.value,
+          queixaPrincipal: f.queixaPrincipal.value,
+          sinaisVitais: { pa: f.pa.value, fc: f.fc.value, fr: f.fr.value, temp: f.temp.value, sato2: f.sato2.value },
+          nivelConsciencia: f.nivelConsciencia.value,
+          escalaDor: f.dor.value,
+          classificacao: document.getElementById('classificacao').value
+        });
+        alert('Triagem salva com sucesso!');
+        window.location.href = 'enfermagem.html';
+      } catch (e) {
+        console.error(e);
+        alert('Erro ao salvar triagem.');
+      }
+    }
+    window.salvarTriagem = salvarTriagem;
+  </script>
+</body>
+</html>

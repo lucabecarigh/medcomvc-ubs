@@ -14,6 +14,7 @@
     <select id="tipo-usuario">
       <option value="pacientes">Sou Paciente</option>
       <option value="medicos">Sou Médico</option>
+      <option value="enfermagem">Sou Enfermagem</option>
     </select>
 
     <input type="email" id="email" placeholder="Digite seu e-mail" />
@@ -59,13 +60,17 @@
         const uid = userCredential.user.uid;
         localStorage.setItem("uid", uid);
 
-        const docRef = await getDoc(doc(db, tipo, uid));
-        if (docRef.exists()) {
-          const destino = tipo === "medicos" ? "medico.html" : "paciente.html";
-          window.location.href = destino;
-        } else {
-          alert("Usuário não registrado como " + tipo + ".");
-        }
+        // verifica existência em cada coleção
+    const docRef = await getDoc(doc(db, tipo, uid));
+    if (docRef.exists()) {
+      let destino;
+      if (tipo === "medicos")    destino = "medico.html";
+      else if (tipo === "pacientes") destino = "paciente.html";
+      else if (tipo === "enfermagem") destino = "enfermagem.html";  // NOVO
+      window.location.href = destino;
+    } else {
+      alert("Usuário não registrado como " + tipo + ".");
+    }
 
       } catch (error) {
         console.error("Erro no login:", error);
