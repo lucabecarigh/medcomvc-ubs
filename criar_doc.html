@@ -380,27 +380,32 @@ await uploadBytes(storageRef, pdfBlob);
     };
 
     /* ---------- Função comum para chamar a OpenAI (Clinbot) ---------- */
-    async function chamarOpenAI() {
-      const chatDiv = document.getElementById("clinbotChat");
-      chatDiv.hidden = false;
-      conversaLog("assistant", "⏳ Pensando...");
+async function chamarOpenAI() {
+  const chatDiv = document.getElementById("clinbotChat");
+  chatDiv.hidden = false;
+  conversaLog("assistant", "⏳ Pensando...");
 
-      try {
-        const resposta = await fetch("http://127.0.0.1:8000/clinbot/", {  method: "POST",
-  headers: { "Content-Type":"application/json" },
-  body: JSON.stringify({ mensagem: conversation[0].content })
-});
-const data = await resposta.json();
-const respostaBruta = data.reply.trim();
+  try {
+    /* envie o array completo `conversation` */
+    const resposta = await fetch("http://127.0.0.1:8000/clinbot/", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ conversation })          // 🔑 histórico inteiro
+    });
 
-chatDiv.lastChild.innerHTML = "🤖 " + formatAssistant(respostaBruta);
-conversation.push({ role:"assistant", content: respostaBruta });
+    if (!resposta.ok) throw new Error(`HTTP ${resposta.status}`);
 
-      } catch (e) {
-        console.error("Erro no Clinbot:", e);
-        chatDiv.lastChild.textContent = "❌ Erro ao obter resposta do Clinbot.";
-      }
-    }
+    const data          = await resposta.json();
+    const respostaBruta = (data.reply || "").trim();
+
+    chatDiv.lastChild.innerHTML = "🤖 " + formatAssistant(respostaBruta);
+    conversation.push({ role: "assistant", content: respostaBruta });
+
+  } catch (e) {
+    console.error("Erro no Clinbot:", e);
+    chatDiv.lastChild.textContent = "❌ Erro ao obter resposta do Clinbot.";
+  }
+}
 
 /* ---------- Helper para exibir conversa ---------- */
 function conversaLog(role, texto){
