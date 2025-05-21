@@ -3,60 +3,83 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Cadastro de Novo Usuário</title>
+  <title>Cadastro de Novo Paciente</title>
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
   <h1>Cadastrar Novo Paciente</h1>
 
   <div class="login-container">
-    <input type="email" id="email" placeholder="Digite seu e-mail" />
-    <input type="password" id="senha" placeholder="Digite uma senha" />
+    <input type="text"     id="nome"       placeholder="Nome completo" />
+    <input type="email"    id="email"      placeholder="E-mail"        />
+    <input type="tel"      id="telefone"   placeholder="Telefone"      />
+    <input type="date"     id="nascimento" placeholder="Data de nasc." />
+    <input type="password" id="senha"      placeholder="Digite uma senha" />
     <button id="btnCadastrar">Cadastrar</button>
   </div>
 
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
     import { getAuth, createUserWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-auth.js";
-    import { getFirestore, setDoc, doc } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
+    import { getFirestore, setDoc, doc, updateDoc, arrayUnion } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
 
     const firebaseConfig = {
       apiKey: "AIzaSyAmF5FS_ekWW_7-1RUHtGCR71LH6r9fg08",
       authDomain: "medcomvc-ubs.firebaseapp.com",
       projectId: "medcomvc-ubs",
-      storageBucket: "medcomvc-ubs.appspot.com",
+      storageBucket: "medcomvc-ubs.firebasestorage.app",
       messagingSenderId: "313420248004",
-      appId: "1:313420248004:web:a9a28d97b3ef2e33c36a91",
-      measurementId: "G-04YK0WXT42"
+      appId: "1:313420248004:web:a9a28d97b3ef2e33c36a91"
     };
 
-    const app = initializeApp(firebaseConfig);
+    const app  = initializeApp(firebaseConfig);
     const auth = getAuth(app);
-    const db = getFirestore(app);
+    const db   = getFirestore(app);
 
     document.getElementById("btnCadastrar").addEventListener("click", async () => {
-      const email = document.getElementById("email").value;
-      const senha = document.getElementById("senha").value;
+      const nome   = document.getElementById("nome").value.trim();
+      const email  = document.getElementById("email").value.trim();
+      const tel    = document.getElementById("telefone").value.trim();
+      const nasc   = document.getElementById("nascimento").value;
+      const senha  = document.getElementById("senha").value;
+
+      if(!nome || !email || !tel || !nasc || !senha){
+        alert("Preencha todos os campos."); return;
+      }
 
       try {
-        const userCredential = await createUserWithEmailAndPassword(auth, email, senha);
-        const uid = userCredential.user.uid;
+        /* 1. cria usuário Auth */
+        const cred = await createUserWithEmailAndPassword(auth, email, senha);
+        const uid  = cred.user.uid;
 
-        // Criar documento na coleção "pacientes"
+        /* 2. cria documento paciente */
         await setDoc(doc(db, "pacientes", uid), {
           criadoEm: new Date().toISOString(),
-          calendario: [{}],
-          identificacao: [{email: email}],
-          meusmedicos: [{}],
-          resumo: [{}],
-          prontuario: [{}],
-          tratamento: [{}],
-          exame: [{}],
-          documento: [{}]
+          calendario: [],
+          documento : [],
+          exame     : [],
+          identificacao: [{
+            nome,
+            email,
+            telefone: tel,
+            data_nascimento: nasc
+          }],
+          meusmedicos: [],     // será preenchido se o médico logado existir
+          prontuario : [],
+          resumo     : [],
+          tratamento : []
         });
 
-  
-        
+        /* 3. se um médico estiver logado neste navegador, vincula paciente a ele */
+        const uidMedico = localStorage.getItem("uid");
+        if(uidMedico){
+          await updateDoc(doc(db,"medicos",uidMedico),{
+            meuspacientes: arrayUnion(uid)
+          });
+          await updateDoc(doc(db,"pacientes",uid),{
+            meusmedicos: arrayUnion(uidMedico)
+          });
+        }
 
         alert("Usuário cadastrado com sucesso!");
         window.location.href = "index.html";

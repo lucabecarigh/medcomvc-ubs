@@ -7,30 +7,32 @@
   <link rel="stylesheet" href="style.css" />
 
   <style>
-    /* estilos rápidos pro modal */
+    /* ───────── modal e botões (já existiam) ───────── */
     .modal          { position:fixed; top:0; left:0; width:100%; height:100%;
                       background:rgba(0,0,0,.6); display:none; align-items:center; justify-content:center; }
     .modal-content  { background:#fff; padding:20px; border-radius:8px; width:90%; max-width:400px; }
     .modal-content input{ width:100%; padding:8px; margin:6px 0; }
     .btn-consultas  { margin:6px 3px; padding:10px 15px; }
     .pasta          { background:#e9ecef; padding:8px 12px; margin:4px 0; cursor:pointer; border-radius:6px;}
+
+    /* ───────── NOVO: centraliza a tabela ───────── */
+    #tblPacientes   { margin:0 auto; }
   </style>
 </head>
 <body>
   <h1>👨‍⚕️ Meus Pacientes</h1>
 
-<!-- Filtro + Tabela -->
-<input id="filtroPac" type="text" placeholder="🔍 Pesquisar paciente..." style="width:300px;margin:8px 0;padding:6px;">
-<table id="tblPacientes" border="1" style="border-collapse:collapse;width:100%;max-width:600px;">
-  <thead>
-    <tr>
-      <th data-col="nome">Nome ▲▼</th>
-      <th data-col="sobrenome">Sobrenome ▲▼</th>
-      <th data-col="idade">Idade ▲▼</th>
-    </tr>
-  </thead>
-  <tbody><tr><td colspan="3">Carregando pacientes...</td></tr></tbody>
-</table>
+  <!-- Filtro + Tabela -->
+  <input id="filtroPac" type="text" placeholder="🔍 Pesquisar paciente..." style="width:300px;margin:8px 0;padding:6px;">
+  <table id="tblPacientes" border="1" style="border-collapse:collapse;width:100%;max-width:600px;">
+    <thead>
+      <tr>
+        <th data-col="nome">Nome ▲▼</th>
+        <th data-col="idade">Idade ▲▼</th>
+      </tr>
+    </thead>
+    <tbody><tr><td colspan="2">Carregando pacientes...</td></tr></tbody>
+  </table>
 
   <button class="btn-consultas" onclick="abrirCalendario()">📅 Ver todas as consultas</button>
   <button class="btn-consultas" onclick="abrirModalNovoPaciente()">➕ Adicionar novo paciente</button>
@@ -39,12 +41,10 @@
   <div id="modalNovoPaciente" class="modal">
     <div class="modal-content">
       <h2>Novo Paciente</h2>
-      <input type="text"   id="novo-nome"        placeholder="Nome"          />
-      <input type="text"   id="novo-sobrenome"   placeholder="Sobrenome"     />
-      <input type="email"  id="novo-email"       placeholder="E‑mail"        />
-      <input type="date"   id="novo-nascimento"  placeholder="Data de nasc." />
-      <input type="tel"    id="novo-telefone"    placeholder="Telefone"      />
-      <input type="text"   id="novo-endereco"    placeholder="Endereço"      />
+      <input type="text"  id="novo-nome"       placeholder="Nome completo" />
+      <input type="email" id="novo-email"      placeholder="E-mail"        />
+      <input type="date"  id="novo-nascimento" placeholder="Data de nasc." />
+      <input type="tel"   id="novo-telefone"   placeholder="Telefone"      />
 
       <button onclick="salvarNovoPaciente()">Salvar</button>
       <button onclick="fecharModalNovoPaciente()">Cancelar</button>
@@ -73,86 +73,119 @@
     const db   = getFirestore(app);
     const auth = getAuth(app);
 
-    async function listarPacientes() {
-  const tbody = document.querySelector("#tblPacientes tbody");
-  tbody.innerHTML = "<tr><td colspan='3'>Carregando...</td></tr>";
-
-  const uidMedico = localStorage.getItem("uid");
-  if (!uidMedico) { tbody.innerHTML = "<tr><td colspan='3'>Erro: médico não identificado.</td></tr>"; return; }
-
-  try {
-    const medicoSnap = await getDoc(doc(db,"medicos",uidMedico));
-    if (!medicoSnap.exists()) { tbody.innerHTML = "<tr><td colspan='3'>Médico não encontrado.</td></tr>"; return; }
-
-    const uids = medicoSnap.data().meuspacientes || [];
-    if (!uids.length){ tbody.innerHTML = "<tr><td colspan='3'>Você ainda não tem pacientes.</td></tr>"; return; }
-
-    const dados = [];
-    for (const uid of uids){
-      const pSnap = await getDoc(doc(db,"pacientes",uid));
-      if (!pSnap.exists()) continue;
-      const id = pSnap.data().identificacao?.[0] || {};
-      dados.push({ uid, nome:id.nome||"", sobrenome:id.sobrenome||"", idade:id.idade||"--" });
+    /* ---------- Utils ---------- */
+    function calcIdade(dataISO){
+      if(!dataISO) return "--";
+      const hoje   = new Date();
+      const nasc   = new Date(dataISO);
+      let idade    = hoje.getFullYear() - nasc.getFullYear();
+      const m      = hoje.getMonth() - nasc.getMonth();
+      if (m < 0 || (m === 0 && hoje.getDate() < nasc.getDate())) idade--;
+      return idade;
     }
-    renderTabela(dados);
-  }catch(e){ console.error(e); tbody.innerHTML = "<tr><td colspan='3'>Erro ao carregar.</td></tr>"; }
-}
 
-function renderTabela(lista){
-  const tbody = document.querySelector("#tblPacientes tbody");
-  if(!lista.length){ tbody.innerHTML="<tr><td colspan='3'>Nenhum paciente.</td></tr>"; return; }
+    /* ---------- Lista pacientes ---------- */
+    async function listarPacientes() {
+      const tbody = document.querySelector("#tblPacientes tbody");
+      tbody.innerHTML = "<tr><td colspan='2'>Carregando...</td></tr>";
 
-  tbody.innerHTML = "";
-  for(const p of lista){
-    const tr = document.createElement("tr");
-    tr.innerHTML = `<td>${p.nome}</td><td>${p.sobrenome}</td><td style="text-align:center;">${p.idade}</td>`;
-    tr.onclick = ()=>{ localStorage.setItem("pacienteSelecionado",p.uid); window.location.href="paciente_view.html"; };
-    tbody.appendChild(tr);
-  }
-}
+      const uidMedico = localStorage.getItem("uid");
+      if (!uidMedico){
+        tbody.innerHTML = "<tr><td colspan='2'>Erro: médico não identificado.</td></tr>";
+        return;
+      }
 
-/* ---- Filtro de busca ---- */
-document.getElementById("filtroPac").addEventListener("input", e=>{
-  const termo = e.target.value.toLowerCase();
-  [...document.querySelectorAll("#tblPacientes tbody tr")].forEach(tr=>{
-    tr.style.display = tr.textContent.toLowerCase().includes(termo) ? "" : "none";
-  });
-});
+      try {
+        const medicoSnap = await getDoc(doc(db,"medicos",uidMedico));
+        if (!medicoSnap.exists()){
+          tbody.innerHTML = "<tr><td colspan='2'>Médico não encontrado.</td></tr>";
+          return;
+        }
 
-/* ---- Ordenação por cabeçalho ---- */
-let sortDir = 1;   // 1 asc, -1 desc
-document.querySelectorAll("#tblPacientes th").forEach(th=>{
-  th.addEventListener("click", ()=>{
-    const col = th.dataset.col;
-    const rows = [...document.querySelectorAll("#tblPacientes tbody tr")];
-    rows.sort((a,b)=>{
-      const ta = a.children[th.cellIndex].textContent.trim().toLowerCase();
-      const tb = b.children[th.cellIndex].textContent.trim().toLowerCase();
-      return ta > tb ? sortDir : ta < tb ? -sortDir : 0;
+        const uids = medicoSnap.data().meuspacientes || [];
+        if (!uids.length){
+          tbody.innerHTML = "<tr><td colspan='2'>Você ainda não tem pacientes.</td></tr>";
+          return;
+        }
+
+        const dados = [];
+        for (const uid of uids){
+          const pSnap = await getDoc(doc(db,"pacientes",uid));
+          if (!pSnap.exists()) continue;
+          const id = pSnap.data().identificacao?.[0] || {};
+          dados.push({
+            uid,
+            nome : id.nome  || "",
+            idade: calcIdade(id.data_nascimento)
+          });
+        }
+        renderTabela(dados);
+      }catch(e){
+        console.error(e);
+        tbody.innerHTML = "<tr><td colspan='2'>Erro ao carregar.</td></tr>";
+      }
+    }
+
+    function renderTabela(lista){
+      const tbody = document.querySelector("#tblPacientes tbody");
+      if(!lista.length){
+        tbody.innerHTML="<tr><td colspan='2'>Nenhum paciente.</td></tr>";
+        return;
+      }
+      tbody.innerHTML = "";
+      for(const p of lista){
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+          <td>${p.nome}</td>
+          <td style="text-align:center;">${p.idade}</td>
+        `;
+        tr.onclick = ()=>{
+          localStorage.setItem("pacienteSelecionado",p.uid);
+          window.location.href="paciente_view.html";
+        };
+        tbody.appendChild(tr);
+      }
+    }
+
+    /* ---- Filtro de busca ---- */
+    document.getElementById("filtroPac").addEventListener("input", e=>{
+      const termo = e.target.value.toLowerCase();
+      [...document.querySelectorAll("#tblPacientes tbody tr")].forEach(tr=>{
+        tr.style.display = tr.textContent.toLowerCase().includes(termo) ? "" : "none";
+      });
     });
-    sortDir *= -1;
-    rows.forEach(r=> r.parentElement.appendChild(r));
-  });
-});
+
+    /* ---- Ordenação ---- */
+    let sortDir = 1;
+    document.querySelectorAll("#tblPacientes th").forEach(th=>{
+      th.addEventListener("click", ()=>{
+        const rows = [...document.querySelectorAll("#tblPacientes tbody tr")];
+        rows.sort((a,b)=>{
+          const ta = a.children[th.cellIndex].textContent.trim().toLowerCase();
+          const tb = b.children[th.cellIndex].textContent.trim().toLowerCase();
+          return ta > tb ? sortDir : ta < tb ? -sortDir : 0;
+        });
+        sortDir *= -1;
+        rows.forEach(r=> r.parentElement.appendChild(r));
+      });
+    });
 
     /* ---------- Modal controls ---------- */
-    function abrirCalendario() {
-  localStorage.removeItem("pacienteAgenda");   // garante modo “todas as consultas”
-  window.location.href = "calendario.html";
-}    function abrirModalNovoPaciente(){ document.getElementById("modalNovoPaciente").style.display="flex"; }
+    function abrirCalendario(){
+      localStorage.removeItem("pacienteAgenda");
+      window.location.href = "calendario.html";
+    }
+    function abrirModalNovoPaciente(){ document.getElementById("modalNovoPaciente").style.display="flex"; }
     function fecharModalNovoPaciente(){ document.getElementById("modalNovoPaciente").style.display="none"; }
 
     /* ---------- Salvar novo paciente ---------- */
     async function salvarNovoPaciente(){
-      /* Coleta dados */
-      const nome       = document.getElementById("novo-nome").value.trim();
-      const sobrenome  = document.getElementById("novo-sobrenome").value.trim();
-      const email      = document.getElementById("novo-email").value.trim();
-      const nasc       = document.getElementById("novo-nascimento").value;
-      const telefone   = document.getElementById("novo-telefone").value.trim();
-      const endereco   = document.getElementById("novo-endereco").value.trim();
+      const nome  = document.getElementById("novo-nome").value.trim();
+      const email = document.getElementById("novo-email").value.trim();
+      const nasc  = document.getElementById("novo-nascimento").value;
+      const tel   = document.getElementById("novo-telefone").value.trim();
 
-      if (!nome||!sobrenome||!email||!nasc||!telefone||!endereco){
+      if (!nome || !email || !nasc || !tel){
         alert("Preencha todos os campos."); return;
       }
 
@@ -172,11 +205,10 @@ document.querySelectorAll("#tblPacientes th").forEach(th=>{
           documento : [],
           exame     : [],
           identificacao: [{
-            nome, sobrenome,
+            nome,
             email,
             data_nascimento: nasc,
-            telefone,
-            endereco
+            telefone: tel
           }],
           meusmedicos: [uidMedico],
           prontuario : [],
@@ -200,11 +232,11 @@ document.querySelectorAll("#tblPacientes th").forEach(th=>{
       }
     }
 
-    /* ---------- Exposição no global (para onclick) ---------- */
-    window.abrirCalendario            = abrirCalendario;
-    window.abrirModalNovoPaciente     = abrirModalNovoPaciente;
-    window.fecharModalNovoPaciente    = fecharModalNovoPaciente;
-    window.salvarNovoPaciente         = salvarNovoPaciente;
+    /* ---------- Exposição global ---------- */
+    window.abrirCalendario        = abrirCalendario;
+    window.abrirModalNovoPaciente = abrirModalNovoPaciente;
+    window.fecharModalNovoPaciente= fecharModalNovoPaciente;
+    window.salvarNovoPaciente     = salvarNovoPaciente;
 
     listarPacientes();
   </script>
