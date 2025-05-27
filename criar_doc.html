@@ -71,6 +71,8 @@
       <option value="rotina_pediatria">Rotina Pediatria</option>
       <option value="demanda_espontanea">Demanda Espontânea</option>
     </select>
+    <label for="temaInput">Tema&nbsp;(opcional):</label>
+    <input type="text" id="temaInput" placeholder="Ex.: Rotina hipertensão" style="width:220px;">
   </div>
 
   <!-- TinyMCE -->
@@ -582,7 +584,8 @@ formData.append("file", new File([blob], `chunk.${ext}`, { type: blob.type }));
 
     /* ---------- Geração da nota SOAP ---------- */
     async function gerarNotaSOAP(transcricao) {
-  const tema = document.getElementById("temaInput").value.trim() || "Consulta";
+  const temaEl = document.getElementById("temaInput");
+  const tema   = temaEl ? (temaEl.value.trim() || "Consulta") : "Consulta";
   try {
     const resp = await fetch("http://127.0.0.1:8000/summarize/", {
       method: "POST",
