@@ -75,31 +75,71 @@
     </div>
   </div>
 
-  <script>
-    const id = localStorage.getItem("pacienteSelecionado");
-    document.getElementById("nomePaciente").innerText = "Visualizando: " + id;
-
-    function abrirPasta(pasta) {
+  <script type="module">
+    /* ------------ Firebase -------------- */
+    import {
+      initializeApp, getApps, getApp
+    } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
+    import {
+      getFirestore, doc, getDoc
+    } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
+  
+    const firebaseConfig = {
+      apiKey: "AIzaSyAmF5FS_ekWW_7-1RUHtGCR71LH6r9fg08",
+      authDomain: "medcomvc-ubs.firebaseapp.com",
+      projectId: "medcomvc-ubs",
+      storageBucket: "medcomvc-ubs.firebasestorage.app",
+      messagingSenderId: "313420248004",
+      appId: "1:313420248004:web:a9a28d97b3ef2e33c36a91"
+    };
+  
+    /* Reaproveita a app se já existir (evita erro “already exists”) */
+    const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
+    const db  = getFirestore(app);
+  
+    /* ------------ UID recebido da página anterior ------------ */
+    const uidPaciente = localStorage.getItem("pacienteSelecionado");
+    if (!uidPaciente) {
+      alert("Nenhum paciente selecionado.");
+      window.location.href = "medico.html";
+    }
+  
+    /* ------------ Mostra nome no topo ------------ */
+    const nomeEl = document.getElementById("nomePaciente");
+    async function carregarNome() {
+      nomeEl.textContent = "Carregando paciente...";
+      try {
+        const snap = await getDoc(doc(db, "pacientes", uidPaciente));
+        if (!snap.exists()) {
+          nomeEl.textContent = "Paciente não encontrado";
+          return;
+        }
+        /* identificacao[0].nome contém o nome completo */
+        const id = snap.data().identificacao?.[0] || {};
+        nomeEl.textContent = `Paciente: ${id.nome || uidPaciente}`;
+      } catch (e) {
+        console.error(e);
+        nomeEl.textContent = "Erro ao carregar paciente";
+      }
+    }
+    carregarNome();
+  
+    /* ------------ Navegação / Botões ------------ */
+    window.abrirPasta = pasta => {
       localStorage.setItem("pastaSelecionada", pasta);
       window.location.href = `${pasta}.html`;
-    }
-
-    function abrirCalendario() {
-  localStorage.setItem("pacienteAgenda", id);   // passa o UID do paciente
-  window.location.href = "calendario.html";
-}
-
-    function novoArquivo() {
-      window.location.href = "criar_doc.html";
-    }
-
-    function adicionarArquivoExistente() {
+    };
+  
+    window.abrirCalendario = () => {
+      localStorage.setItem("pacienteAgenda", uidPaciente);
+      window.location.href = "calendario.html";
+    };
+  
+    window.novoArquivo = () => window.location.href = "criar_doc.html";
+    window.adicionarArquivoExistente = () =>
       document.getElementById("modalUploadArquivo").style.display = "flex";
-    }
-
-    function fecharUpload() {
+    window.fecharUpload = () =>
       document.getElementById("modalUploadArquivo").style.display = "none";
-    }
   </script>
 
   <script type="module" src="script.js"></script>
