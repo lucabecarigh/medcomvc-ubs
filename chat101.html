@@ -22,11 +22,6 @@
   <button onclick="enviar()">Enviar</button>
 
   <script>
-    /* ---------- Backend API base ---------- */
-    const DEV = location.port === "5500";
-    const API_BASE = DEV ? "http://127.0.0.1:8000/api" : "/api";
-    const PATIENT_EP = `${API_BASE}/patient_chat/`;
-
     /* ---------- UID do paciente salvo no login ---------- */
     const uidPaciente = localStorage.getItem("uid");
     if(!uidPaciente){
@@ -54,50 +49,27 @@
       } close(); return html;
     }
 
-    /* ---------- cria elemento de mensagem evitando XSS ---------- */
-    function criarMsg(classe, conteudo, isHTML = false) {
-      const div = document.createElement("div");
-      div.className = `msg ${classe}`;
-      if (isHTML) {
-        div.innerHTML = conteudo;           // já vem formatado do backend
-      } else {
-        div.textContent = conteudo;         // evita XSS para texto do usuário
-      }
-      return div;
-    }
-
     /* ---------- envia pergunta ---------- */
-    async function enviar() {
-      const txtEl = document.getElementById("input");
-      const txt   = txtEl.value.trim();
-      if (!txt) return;
+    async function enviar(){
+      const txtEl=document.getElementById("input");
+      const txt  =txtEl.value.trim(); if(!txt) return;
+      const chat =document.getElementById("chat");
+      chat.innerHTML+=`<div class="msg user">👤 ${txt}</div>`;
+      txtEl.value="";
 
-      const chat = document.getElementById("chat");
-      chat.appendChild(criarMsg("user", `👤 ${txt}`));   // seguro
-
-      txtEl.value = "";
-      const btn   = document.querySelector("button[onclick='enviar()']");
-      if (btn) btn.disabled = true;
-
-      try {
-        const res = await fetch(PATIENT_EP, {
-          method: "POST",
-          headers: { "Content-Type":"application/json" },
+      try{
+        const res = await fetch("http://127.0.0.1:8000/patient_chat/",{
+          method:"POST",
+          headers:{ "Content-Type":"application/json" },
           body: JSON.stringify({ uid: uidPaciente, question: txt })
         });
-        if (!res.ok) throw new Error(res.status);
-        const j = await res.json();
-        chat.appendChild(
-          criarMsg("bot", `🤖 ${formatAssistant(j.answer)}`, true)
-        );
-      } catch (e) {
-        chat.appendChild(
-          criarMsg("bot", "❌ Erro ao consultar. Tente novamente.", false)
-        );
-      } finally {
-        if (btn) btn.disabled = false;
-        chat.scrollTop = chat.scrollHeight;
+        if(!res.ok) throw new Error(res.status);
+        const j=await res.json();
+        chat.innerHTML+=`<div class="msg bot">🤖 ${formatAssistant(j.answer)}</div>`;
+      }catch(e){
+        chat.innerHTML+=`<div class="msg bot">❌ Erro ao consultar. Tente novamente.</div>`;
       }
+      chat.scrollTop=chat.scrollHeight;
     }
   </script>
 </body>
