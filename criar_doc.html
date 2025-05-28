@@ -284,6 +284,8 @@ if (/^##\s+/.test(line) || /^###\s+/.test(line)) {
         alert("Preencha o conteúdo e escolha uma pasta.");
         return;
       }
+      const ok = confirm(`Salvar documento na pasta "${tipo.toUpperCase()}"?`);
+      if (!ok) return;    // usuário cancelou
 
       try {
         const docRef = doc(db,"pacientes",pacienteId);
@@ -356,6 +358,14 @@ if (/^##\s+/.test(line) || /^###\s+/.test(line)) {
 
         const storageRef = ref(storage, `pacientes/${pacienteId}/${tipo}/${nomePDF}`);
         await uploadBytes(storageRef, pdfBlob); 
+        const urlPDF = await getDownloadURL(storageRef);
+        const novaAba = window.open(urlPDF, "_blank");
+        // tenta abrir diálogo de impressão quando o PDF carregar
+        if (novaAba) {
+          novaAba.onload = () => {
+            try { novaAba.print(); } catch(e){}
+          };
+        }
 
         alert("Documento salvo com sucesso!");
         window.location.href = "paciente_view.html";
