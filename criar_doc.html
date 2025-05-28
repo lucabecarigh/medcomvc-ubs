@@ -98,7 +98,7 @@
     <button onclick="salvarDocumento()">💾 Salvar</button>
     <button onclick="clinbotPrimeiraAnalise()">🤖 Clinbot</button>
     <button onclick="voltar()">🔙 Voltar</button>
-    <button onclick="window.open('./MedUtis/index.html', '_blank')" style="margin:5px; padding:8px 15px;">💊 med.utis</button>
+    <button onclick="abrirMedUtis()" style="margin:5px; padding:8px 15px;">💊 med.utis</button>
   </div>
 
   <!-- Área de chat / respostas -->
@@ -134,7 +134,24 @@ const firebaseConfig = {
     const pacienteId = localStorage.getItem("pacienteSelecionado");
     const medicoId   = localStorage.getItem("uid");
 
-    
+    /* ---------- Aplica preset de pasta se vier na URL ---------- */
+    const preset = new URLSearchParams(window.location.search).get('preset');
+    if (preset) {
+      const tipoSel = document.getElementById('tipo');
+      if (tipoSel && [...tipoSel.options].some(o => o.value === preset)) {
+        tipoSel.value = preset;
+      }
+    }
+
+    /* ---------- Abrir med.utis + aba de receita ---------- */
+    window.abrirMedUtis = () => {
+      /* 1) miniapp med.utis */
+      window.open('./MedUtis/index.html', '_blank');
+      /* 2) nova aba deste mesmo editor já com "tratamento" pré‑selecionado */
+      const url = new URL(window.location.href);
+      url.searchParams.set('preset', 'tratamento');
+      window.open(url.toString(), '_blank');
+    };
 
     /* ---------- Histórico de conversa (Clinbot) ---------- */
     const conversation = []; // {role:"user"/"assistant", content:"..."}
