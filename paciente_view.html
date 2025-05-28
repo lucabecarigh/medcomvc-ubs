@@ -53,6 +53,7 @@
     <h3>Gerenciar Pastas</h3>
     <button onclick="novoArquivo()">➕ Criar novo arquivo</button>
     <button onclick="adicionarArquivoExistente()">📎 Adicionar arquivo existente</button>
+    <button onclick="voltar()">🔙 Voltar</button>
   </div>
 
   <!-- Modal de Upload -->
@@ -123,6 +124,9 @@
       }
     }
     carregarNome();
+
+    /* ---------- Voltar ---------- */
+    window.voltar = () => window.location.href = "medico.html";
   
     /* ------------ Navegação / Botões ------------ */
     window.abrirPasta = pasta => {
