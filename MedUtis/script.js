@@ -1,8 +1,16 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.0/firebase-app.js";
-import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.0/firebase-auth.js";
-import { getFirestore, collection, addDoc, getDocs, doc, updateDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/11.6.0/firebase-firestore.js";
+import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.0/firebase-auth.js";
+import {
+  getFirestore,
+  collection,
+  addDoc,
+  getDocs,
+  doc,
+  updateDoc,
+  deleteDoc
+} from "https://www.gstatic.com/firebasejs/11.6.0/firebase-firestore.js";
 
-// 1) CONFIGURAÇÃO DO SEU PROJETO FIREBASE
+/* 1) Configuração Firebase */
 const firebaseConfig = {
   apiKey: "AIzaSyAmF5FS_ekWW_7-1RUHtGCR71LH6r9fg08",
   authDomain: "medcomvc-ubs.firebaseapp.com",
@@ -13,22 +21,21 @@ const firebaseConfig = {
   measurementId: "G-GCDLLVE7SX"
 };
 
-// 2) INICIALIZA O FIREBASE
-const app = initializeApp(firebaseConfig);
-const db = getFirestore(app);
-const auth = getAuth(app);
+/* 2) Inicializa-se */
+const app  = initializeApp(firebaseConfig);
+const auth = getAuth(app);          // cria auth primeiro
+const db   = getFirestore(app);     // depois Firestore
 
-// 3) FUNÇÃO PARA FAZER LOGIN ANÔNIMO
-async function autenticarAnonimamente() {
-  try {
-    await signInAnonymously(auth);
-    console.log("✅ Sign-in anônimo bem-sucedido (MedUtis)");
+/* 3) Reutiliza sessão do médico já logado */
+onAuthStateChanged(auth, async (user) => {
+  if (user) {
+    console.log("MedUtis: usuário autenticado →", user.uid);
     await loadMedsFromFirestore();
     renderList();
-  } catch (error) {
-    console.error("❌ Erro ao fazer sign-in anônimo:", error);
+  } else {
+    console.warn("MedUtis: nenhum usuário logado — faça login no app principal.");
   }
-}
+});
 
 // ====================================================================
 // LÓGICA DO SEU APLICATIVO
@@ -182,6 +189,7 @@ async function deleteMed(index) {
 
 function showCancelButton(show) {
   const btn = document.getElementById("cancelEdit");
+  if (!btn) return;
   btn.style.display = show ? "inline-block" : "none";
 }
 
@@ -201,10 +209,7 @@ document.getElementById("search")?.addEventListener("input", () => {
   renderList();
 });
 
-// ⏳ FAZ LOGIN ANÔNIMO APENAS APÓS O CARREGAMENTO
-window.onload = () => {
-  autenticarAnonimamente();
-};
+
 
 // Exportando para HTML
 window.addMed = addMed;
