@@ -111,6 +111,12 @@
 
   <!-- Firebase + OpenAI + toda a lógica -->
   <script type="module">
+    /* ---------- Backend API base ---------- */
+    const DEV = location.port === "5500";
+const API_BASE = DEV ? "http://127.0.0.1:8000/api" : "/api";
+const CLINBOT_EP    = `${API_BASE}/clinbot/`;
+const TRANSCRIBE_EP = `${API_BASE}/transcribe/`;
+const SUMMARIZE_EP  = `${API_BASE}/summarize/`;
     /* ---------- Firebase ---------- */
     import { initializeApp }                          from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
     import { getFirestore, doc, getDoc, updateDoc }   from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
@@ -468,7 +474,7 @@ async function chamarOpenAI() {
 
   try {
     /* envie o array completo `conversation` */
-    const resposta = await fetch("http://127.0.0.1:8000/clinbot/", {
+    const resposta = await fetch(CLINBOT_EP, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ conversation })          // 🔑 histórico inteiro
@@ -646,9 +652,9 @@ async function finalizarGravacao(){
 async function transcreverAudio(blob) {
   const formData = new FormData();
   const ext  = blob.type.includes("ogg") ? "ogg" : "webm";
-formData.append("file", new File([blob], `chunk.${ext}`, { type: blob.type }));
+  formData.append("file", new File([blob], `chunk.${ext}`, { type: blob.type }));
   try {
-    const resp = await fetch("http://127.0.0.1:8000/transcribe/", {
+    const resp = await fetch(TRANSCRIBE_EP, {
       method: "POST",
       body: formData,
     });
@@ -664,7 +670,7 @@ formData.append("file", new File([blob], `chunk.${ext}`, { type: blob.type }));
     /* ---------- Geração da nota SOAP ---------- */
     async function gerarNotaSOAP(transcricao) {
       try {
-        const resp = await fetch("http://127.0.0.1:8000/summarize/", {
+        const resp = await fetch(SUMMARIZE_EP, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ transcript: transcricao }),
