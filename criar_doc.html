@@ -153,6 +153,13 @@ const firebaseConfig = {
       window.open(url.toString(), '_blank');
     };
 
+    // Função para abrir automaticamente abas com preset
+    function abrirAutoTab(preset) {
+      const url = new URL(window.location.href);
+      url.searchParams.set('preset', preset);
+      window.open('./criar_doc.html?' + url.searchParams.toString(), '_blank');
+    }
+
     /* ---------- Histórico de conversa (Clinbot) ---------- */
     const conversation = []; // {role:"user"/"assistant", content:"..."}
 
@@ -233,6 +240,28 @@ if (/^##\s+/.test(line) || /^###\s+/.test(line)) {
       toolbar: 'undo redo | bold italic underline | bullist numlist | image',
       branding: false,
       automatic_uploads: true,
+      images_upload_url: 'postAcceptor.php', // não usado, mas necessário
+      setup: function (editor) {
+      editor.on('init', function () {
+      const presetParam = new URLSearchParams(window.location.search).get('preset');
+     if (!presetParam) return;
+
+     const key   = 'auto_' + presetParam;
+     const saved = localStorage.getItem(key);
+
+     if (saved) {
+       editor.setContent(saved.replace(/\n/g, '<br>')); // converte \n em <br>
+       console.log('Conteúdo aplicado ao TinyMCE (' + key + '):',
+                   saved.slice(0,120) + (saved.length>120?'…':''));
+       localStorage.removeItem(key);
+     } else {
+       console.log('Nenhum conteúdo encontrado para', key);
+     }
+   });
+ },
+
+
+
       images_upload_handler: async function (blobInfo, success, failure) {
         try {
           const file     = blobInfo.blob();
@@ -271,6 +300,8 @@ if (/^##\s+/.test(line) || /^###\s+/.test(line)) {
       },
       content_style:`body{font-family:Helvetica,Arial,sans-serif;font-size:14px;padding:20px;}img{max-width:100%;height:auto;}`
     });
+
+    
 
     /* ---------- Carregar template ---------- */
     document.getElementById("template").addEventListener("change", async function () {
@@ -364,20 +395,45 @@ if (/^##\s+/.test(line) || /^###\s+/.test(line)) {
             }
           </style>`;
 
-        /* ——— cabeçalho bonito + conteúdo original do TinyMCE ——— */
-        const wrapper = document.createElement("div");
-        wrapper.innerHTML = styleFix + `
-          <header style="text-align:center;margin-bottom:20px;">
-            <h2 style="margin:0;">${tipo.charAt(0).toUpperCase()+tipo.slice(1)}</h2>
-            <p style="margin:0;font-size:14px;line-height:1.4;">
-              Paciente: <strong>${pacienteId}</strong><br>
-              Médico: <strong>${medicoId}</strong><br>
-              Data: <strong>${dataParte.replace(/-/g,"/")}</strong> • Hora: <strong>${horaParte.replace("-",":")}</strong>
-            </p>
-            <hr style="margin-top:15px">
-          </header>
-          <div style="text-align:justify;">${htmlContent}</div>
-        `;
+      /* ——— cabeçalho bonito + conteúdo original do TinyMCE ——— */
+let nomePaciente = pacienteId;   // fallback = UID
+let nomeMedico   = medicoId;     // fallback = UID
+
+try {
+  /* ------------ nome do paciente ------------ */
+  const pacSnap = await getDoc(doc(db, "pacientes", pacienteId));
+  if (pacSnap.exists()) {
+    const identPac = pacSnap.data().identificacao;           // array?
+    if (Array.isArray(identPac) && identPac[0]?.nome) {
+      nomePaciente = identPac[0].nome;
+    }
+  }
+
+  /* ------------ nome do médico --------------- */
+  const medSnap = await getDoc(doc(db, "medicos", medicoId));
+  if (medSnap.exists()) {
+    const identMed = medSnap.data().identificacao;           // array?
+    if (Array.isArray(identMed) && identMed[0]?.nome) {
+      nomeMedico = identMed[0].nome;
+    }
+  }
+} catch (err) {
+  console.warn("Falha ao obter nomes:", err); // mantém UID se der erro
+}
+
+const wrapper = document.createElement("div");
+wrapper.innerHTML = styleFix + `
+  <header style="text-align:center;margin-bottom:20px;">
+    <h2 style="margin:0;">${tipo.charAt(0).toUpperCase()+tipo.slice(1)}</h2>
+    <p style="margin:0;font-size:14px;line-height:1.4;">
+      Paciente: <strong>${nomePaciente}</strong><br>
+      Médico: <strong>${nomeMedico}</strong><br>
+      Data: <strong>${dataParte.replace(/-/g,"/")}</strong> • Hora: <strong>${horaParte.replace("-",":")}</strong>
+    </p>
+    <hr style="margin-top:15px">
+  </header>
+  <div style="text-align:justify;">${htmlContent}</div>
+`;
 
         const pdfBlob = await html2pdf().from(wrapper).set({
           margin: [0.4, 0.3],           // top/bot 0.4in, left/right 0.3in
@@ -528,7 +584,7 @@ async function processBlob(blob){
   painel.insertBefore(bloco, painel.firstChild);
   painel.scrollTop = 0;
 
-  /* acumula e gera SOAP a cada 3 transcrições */
+  /* acumula e gera SOAP a cada 10 transcrições */
   transcriptChunks.push(texto.trim());
   summaryCounter++;
   if (summaryCounter % 10 === 0) {
@@ -633,14 +689,30 @@ async function finalizarGravacao(){
   document.getElementById("transcribePanel").hidden = true;
 
   if (transcriptChunks.length) {
+    /// Texto completo da consulta
+    const fullText = transcriptChunks.join(" ");
+
     // Gera a última versão SOAP
-    const soap = await gerarNotaSOAP(transcriptChunks.join(" "));
+    const soap = await gerarNotaSOAP(fullText);
+
     if (soap) {
       // Formata com HTML bonito
       const html = formatAssistant(soap);
       tinymce.get("editor").setContent(html);
     }
-    alert("Transcrição concluída e nota SOAP gerada!");
+
+    // --- NOVO: categorização automática via backend ---
+    const categoriasJSON = await categorizarTranscricao(fullText);
+    if (categoriasJSON) {
+      ["tratamento", "exame", "documento"].forEach(cat => {
+        if (categoriasJSON[cat] && categoriasJSON[cat].length) {
+          const conteudo = categoriasJSON[cat].join("\n\n");
+          console.log('Salvando em', "auto_"+cat, '→',
+            conteudo.slice(0,120) + (conteudo.length>120?'…':''));
+          localStorage.setItem("auto_" + cat, conteudo);          abrirAutoTab(cat);
+        }
+      });
+    }
   }
 }
 
@@ -679,6 +751,22 @@ formData.append("file", new File([blob], `chunk.${ext}`, { type: blob.type }));
         return null;
       }
     }
+
+  /* ---------- Categorização via backend ---------- */
+async function categorizarTranscricao(texto) {
+  try {
+    const resp = await fetch("http://127.0.0.1:8000/categorize/", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ transcript: texto })
+    });
+    if (!resp.ok) throw new Error(await resp.text());
+    return await resp.json();          // {tratamento:[], exame:[], documento:[]}
+  } catch (e) {
+    console.error("Erro na categorização:", e);
+    return null;
+  }
+}
 
   </script>
 
