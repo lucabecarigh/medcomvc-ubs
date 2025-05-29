@@ -162,6 +162,7 @@ const firebaseConfig = {
     let isPaused        = false;
     let cronometro      = null;
     let transcriptChunks = [];   // Armazena todos os textos já transcritos
+    let summaryCounter  = 0;   // Conta quantas transcrições ocorreram
     let keepCycling = false;      // controla se deve continuar gerando blobs
     let audioBuffer     = [];    // Buffer em tempo real para o último chunk
     let soapTimeout     = null;  // Usado para garantir 1 chamada SOAP por chunk
@@ -503,8 +504,6 @@ function conversaLog(role, texto){
   chatDiv.scrollTop = chatDiv.scrollHeight;
 }
 
-
-
     /* ---------- Voltar ---------- */
     window.voltar = () => window.location.href = "paciente_view.html";
 
@@ -529,12 +528,15 @@ async function processBlob(blob){
   painel.insertBefore(bloco, painel.firstChild);
   painel.scrollTop = 0;
 
-  /* acumula e gera SOAP */
+  /* acumula e gera SOAP a cada 3 transcrições */
   transcriptChunks.push(texto.trim());
-  const soap = await gerarNotaSOAP(transcriptChunks.join(" "));
-  if (soap) tinymce.get("editor")
-                   .setContent(`<pre style="white-space:pre-wrap;">${soap}</pre>`);
-}
+  summaryCounter++;
+  if (summaryCounter % 10 === 0) {
+    const soap = await gerarNotaSOAP(transcriptChunks.join(" "));
+    if (soap) tinymce.get("editor")
+                     .setContent(`<pre style="white-space:pre-wrap;">${soap}</pre>`);
+  }
+} // Added missing closing brace for processBlob
 
 window.iniciarGravacao = async () => {
   try{
@@ -683,7 +685,3 @@ formData.append("file", new File([blob], `chunk.${ext}`, { type: blob.type }));
   
 </body>
 </html>
-
-
-
-
