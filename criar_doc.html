@@ -60,17 +60,6 @@
       <option value="documento">Documento</option>
     </select>
 
-    <label for="template">Escolha um modelo:</label>
-    <select id="template">
-      <option value="">-- Nenhum --</option>
-      <option value="primeira_adulto">1ª Consulta Adulto</option>
-      <option value="primeira_pediatria">1ª Consulta Pediatria</option>
-      <option value="puericultura">Puericultura</option>
-      <option value="pre_natal">Pré‑natal</option>
-      <option value="rotina_adulto">Rotina Adulto</option>
-      <option value="rotina_pediatria">Rotina Pediatria</option>
-      <option value="demanda_espontanea">Demanda Espontânea</option>
-    </select>
   </div>
 
   <!-- TinyMCE -->
@@ -130,6 +119,51 @@ const firebaseConfig = {
     const db      = getFirestore(app);
     const storage = getStorage(app, "gs://medcomvc-ubs.firebasestorage.app");
 
+    /* ---------- Textos padrão ---------- */
+    const HEADER_TEXT_RAW = `MUNICÍPIO DE SANTANA DO RIACHO – MINAS GERAIS
+UBS Teobaldo Inácio da Silva
+
+Secretaria Municipal de Saúde
+CNPJ 18.715.458/0001-92
+Rua José de Azevedo Filho, 55
+Centro (35845-000)
+Telefone (31) 3718-6285`;
+
+    const HEADER_HTML = HEADER_TEXT_RAW.replace(/\n/g, '<br>');
+
+    /* ---------- Rodapé padrão para Tratamento ---------- */
+    const TREATMENT_FOOTER_HTML = `
+<div id="rodapeTratamento" class="mceNonEditable" style="margin-top:30px;display:flex;justify-content:space-between;gap:20px;">
+  <div style="white-space:pre-wrap;flex:1;">
+    <strong>COMPRADOR</strong><br>
+    Nome:<br>
+    RG:<br>
+    Órgão Emissor:<br>
+    Endereço:<br>
+    Cidade:<br>
+    Estado:<br>
+    Telefone:
+  </div>
+  <div style="white-space:pre-wrap;flex:1;">
+    <strong>FORNECEDOR</strong><br><br>
+    Assinatura do Farmacêutico:<br><br><br>
+    Data: ___/___/___
+  </div>
+</div>`;
+
+    /* Insere rodapé padrão de tratamento (evita duplicar usando id) */
+    function insertTreatmentFooter(){
+      const editor = tinymce.get('editor');
+      if(!editor) return;
+
+      // evita duplicar usando id
+      if(editor.getContent().includes('rodapeTratamento')) return;
+
+      // coloca o rodapé DEPOIS do conteúdo já existente
+      const current = editor.getContent();
+      editor.setContent(current + '<p><br></p>' + TREATMENT_FOOTER_HTML);
+    }
+
     /* ---------- Variáveis globais ---------- */
     const pacienteId = localStorage.getItem("pacienteSelecionado");
     const medicoId   = localStorage.getItem("uid");
@@ -146,11 +180,11 @@ const firebaseConfig = {
     /* ---------- Abrir med.utis + aba de receita ---------- */
     window.abrirMedUtis = () => {
       /* 1) miniapp med.utis */
-      window.open('./MedUtis/index.html', '_blank');
       /* 2) nova aba deste mesmo editor já com "tratamento" pré‑selecionado */
       const url = new URL(window.location.href);
       url.searchParams.set('preset', 'tratamento');
       window.open(url.toString(), '_blank');
+      window.open('./MedUtis/index.html', '_blank');
     };
 
     // Função para abrir automaticamente abas com preset
@@ -236,29 +270,47 @@ if (/^##\s+/.test(line) || /^###\s+/.test(line)) {
       selector: '#editor',
       height: 500,
       menubar: false,
-      plugins: 'lists image',
+      plugins: 'lists image noneditable',
       toolbar: 'undo redo | bold italic underline | bullist numlist | image',
+      external_plugins: {
+        noneditable: 'https://cdn.jsdelivr.net/npm/tinymce@6.8.3/plugins/noneditable/index.min.js'
+      },
       branding: false,
       automatic_uploads: true,
       images_upload_url: 'postAcceptor.php', // não usado, mas necessário
       setup: function (editor) {
-      editor.on('init', function () {
-      const presetParam = new URLSearchParams(window.location.search).get('preset');
-     if (!presetParam) return;
+        editor.on('init', function () {
+          const presetParam = new URLSearchParams(window.location.search).get('preset');
+          if (presetParam) {
+          const key   = 'auto_' + presetParam;
+          const saved = localStorage.getItem(key);
 
-     const key   = 'auto_' + presetParam;
-     const saved = localStorage.getItem(key);
+          if (saved) {
+            editor.setContent(saved.replace(/\n/g, '<br>')); // converte \n em <br>
+            console.log('Conteúdo aplicado ao TinyMCE (' + key + '):',
+                        saved.slice(0,120) + (saved.length>120?'…':''));
+            localStorage.removeItem(key);
+          } else {
+            console.log('Nenhum conteúdo encontrado para', key);
+          }
+          }
+          /* ---------- Cabeçalho padrão (não‑editável) ---------- */
+          const headerBlock =
+            '<div id="cabecalhoPadrao" class="mceNonEditable" style="text-align:center;">'
+            + HEADER_HTML +
+            '</div><p><br></p>';
 
-     if (saved) {
-       editor.setContent(saved.replace(/\n/g, '<br>')); // converte \n em <br>
-       console.log('Conteúdo aplicado ao TinyMCE (' + key + '):',
-                   saved.slice(0,120) + (saved.length>120?'…':''));
-       localStorage.removeItem(key);
-     } else {
-       console.log('Nenhum conteúdo encontrado para', key);
-     }
-   });
- },
+          const textoAtual = editor.getContent({format:'text'});
+          if(!textoAtual.includes('MUNICÍPIO DE SANTANA DO RIACHO')){
+            editor.setContent(headerBlock + editor.getContent());
+          }
+
+          /* ---------- Rodapé para Tratamento ---------- */
+          if(document.getElementById('tipo').value === 'tratamento'){
+            insertTreatmentFooter();
+          }
+        });
+      },
 
 
 
@@ -301,22 +353,13 @@ if (/^##\s+/.test(line) || /^###\s+/.test(line)) {
       content_style:`body{font-family:Helvetica,Arial,sans-serif;font-size:14px;padding:20px;}img{max-width:100%;height:auto;}`
     });
 
-    
-
-    /* ---------- Carregar template ---------- */
-    document.getElementById("template").addEventListener("change", async function () {
-      const modelo = this.value;
-      if (!modelo) return;
-      try {
-        const docRef = doc(db, "templates", modelo);
-        const snap   = await getDoc(docRef);
-        if (!snap.exists()) throw new Error("Modelo não encontrado.");
-        tinymce.get("editor").setContent(snap.data().v1 || "");
-      } catch (e) {
-        console.error(e);
-        alert("Erro ao carregar o modelo.");
+    /* Adiciona rodapé automaticamente quando o tipo mudar para tratamento */
+    document.getElementById('tipo').addEventListener('change',function(){
+      if(this.value === 'tratamento'){
+        insertTreatmentFooter();
       }
     });
+
 
     /* ---------- Salvar documento (PDF + Firestore) ---------- */
     window.salvarDocumento = async function () {
@@ -611,7 +654,10 @@ window.iniciarGravacao = async () => {
     }
 
     mediaRecorder.ondataavailable = e=>{
-      if(e.data && e.data.size && !isPaused) processBlob(e.data);
+      /* Processa chunk somente se gravação não estiver pausada */
+      if(e.data && e.data.size && !isPaused){
+        processBlob(e.data);
+      }
     };
 
     mediaRecorder.onstop = () => {
@@ -648,19 +694,52 @@ window.iniciarGravacao = async () => {
 /* ---------- Pausar ---------- */
 window.pausarGravacao = () => {
   if(!mediaRecorder || mediaRecorder.state!=="recording") return;
-  isPaused = true;
+
+  /* Interrompe contagem do cronômetro */
+  clearInterval(cronometro);
+
+  /* Interrompe timer que forçaria mediaRecorder.stop() */
   clearTimeout(chunkTimer);
+
+  /* Quando o recorder de fato parar, marcamos pausa */
+  const onStopOnce = () => {
+    isPaused = true;                // marca pausa só DEPOIS do último chunk
+    mediaRecorder.removeEventListener("stop", onStopOnce);
+  };
+  mediaRecorder.addEventListener("stop", onStopOnce);
+
+  /* Garante que o último chunk seja emitido */
   mediaRecorder.stop();
+
+  /* Ajusta UI */
   document.getElementById("pauseBtn").hidden  = true;
   document.getElementById("resumeBtn").hidden = false;
 };
 
 /* ---------- Retomar ---------- */
 window.retomarGravacao = () => {
-  if(!mediaRecorder || !isPaused) return;
-  isPaused = false;
-  mediaRecorder.start();
-  chunkTimer = setTimeout(()=>{ mediaRecorder.stop(); },3000);
+  if (!mediaRecorder || !isPaused) return;
+
+  isPaused = false;           // permite processar novos chunks
+
+  /* Reinicia cronômetro mantendo tempo já decorrido */
+  cronometro = setInterval(() => {
+    currentSeconds++;
+    document.getElementById("tempoLabel").textContent =
+      `${String(Math.floor(currentSeconds / 60)).padStart(2, "0")}:` +
+      `${String(currentSeconds % 60).padStart(2, "0")}`;
+  }, 1000);
+
+  /* Se o MediaRecorder estiver inativo, inicie; caso contrário, apenas reinicie o timer */
+  if (mediaRecorder.state === "inactive") {
+    mediaRecorder.start();
+  }
+
+  /* (Re)inicia o timer para forçar split de chunks */
+  clearTimeout(chunkTimer);
+  chunkTimer = setTimeout(() => { mediaRecorder.stop(); }, 10000);
+
+  /* Ajusta UI */
   document.getElementById("pauseBtn").hidden  = false;
   document.getElementById("resumeBtn").hidden = true;
 };
@@ -696,9 +775,25 @@ async function finalizarGravacao(){
     const soap = await gerarNotaSOAP(fullText);
 
     if (soap) {
-      // Formata com HTML bonito
-      const html = formatAssistant(soap);
-      tinymce.get("editor").setContent(html);
+      /* Formata e encapsula o SOAP em um bloco identificável */
+      const htmlResumo = `<div id="soapGerado">${formatAssistant(soap)}</div>`;
+
+      const editor = tinymce.get("editor");
+      const atual  = editor.getContent();
+
+      let novoConteudo;
+
+      /* se já existir um SOAP anterior, substitui; senão, acrescenta abaixo */
+      if (atual.includes('id="soapGerado"')) {
+        novoConteudo = atual.replace(
+          /<div id="soapGerado"[\s\S]*?<\/div>/,
+          htmlResumo
+        );
+      } else {
+        novoConteudo = atual + '<p><br></p>' + htmlResumo;
+      }
+
+      editor.setContent(novoConteudo);
     }
 
     // --- NOVO: categorização automática via backend ---
