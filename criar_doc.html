@@ -119,10 +119,10 @@ const firebaseConfig = {
     const db      = getFirestore(app);
     const storage = getStorage(app, "gs://medcomvc-ubs.firebasestorage.app");
 
-    /* ---------- API base (local x produção) ---------- */
+    /* ---------- BASE da API (localhost x produção) ---------- */
     const API_BASE =
-      (location.hostname === "med.com.vc" || location.hostname.endsWith(".med.com.vc"))
-        ? "https://med.com.vc"
+      (window.location.hostname === "med.com.vc")
+        ? "https://med.com.vc:8000"
         : "http://127.0.0.1:8000";
 
     /* ---------- Textos padrão ---------- */
