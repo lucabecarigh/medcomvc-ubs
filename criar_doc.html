@@ -122,10 +122,10 @@ const firebaseConfig = {
     /* ---------- BASE da API ----------
    • Usa 127.0.0.1 apenas se você estiver rodando localmente.
    • Para QUALQUER outro hostname (inclusive www.med.com.vc), usa o backend público. */
-const API_BASE =
+   const API_BASE =
   (["localhost", "127.0.0.1"].includes(window.location.hostname))
     ? "http://127.0.0.1:8000"
-    : "https://med.com.vc:8000";
+    : "https://api.med.com.vc";
 
     /* ---------- Textos padrão ---------- */
     const HEADER_TEXT_RAW = `MUNICÍPIO DE SANTANA DO RIACHO – MINAS GERAIS
@@ -281,7 +281,7 @@ if (/^##\s+/.test(line) || /^###\s+/.test(line)) {
       plugins: 'lists image noneditable',
       toolbar: 'undo redo | bold italic underline | bullist numlist | image',
       external_plugins: {
-        noneditable: 'https://cdn.jsdelivr.net/npm/tinymce@6.8.3/plugins/noneditable/plugin.min.js'
+  noneditable: "https://cdn.jsdelivr.net/npm/tinymce@6.8.3/plugins/noneditable/index.min.js"
 },
       branding: false,
       automatic_uploads: true,
