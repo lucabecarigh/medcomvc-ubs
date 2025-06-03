@@ -66,6 +66,7 @@
   <div id="editor-container">
     <textarea id="editor"></textarea>
   </div>
+  <div id="soapStatus" style="text-align:center; margin:10px 0; display:none; font-style:italic; color:#555;">⏳ Gerando SOAP...</div>
 
 <!-- Gravador de áudio -->
 <div class="center" id="audioControls">
@@ -640,10 +641,26 @@ async function processBlob(blob){
   summaryCounter++;
   if (summaryCounter % 10 === 0) {
     const soap = await gerarNotaSOAP(transcriptChunks.join(" "));
-    if (soap) tinymce.get("editor")
-                     .setContent(`<pre style="white-space:pre-wrap;">${soap}</pre>`);
+    if (soap) {
+      const editor = tinymce.get('editor');
+      const atual = editor.getContent();
+      // Format interim SOAP content
+      const interimHtml = `<div id="soapGerado">${formatAssistant(soap)}</div>`;
+      let novoConteudo;
+      if (atual.includes('id="soapGerado"')) {
+        // Replace previous interim or final SOAP block
+        novoConteudo = atual.replace(
+          /<div id="soapGerado"[\s\S]*?<\/div>/,
+          interimHtml
+        );
+      } else {
+        // Append interim SOAP below existing content
+        novoConteudo = atual + '<p><br></p>' + interimHtml;
+      }
+      editor.setContent(novoConteudo);
+    }
   }
-} // Added missing closing brace for processBlob
+}
 
 window.iniciarGravacao = async () => {
   try{
@@ -779,6 +796,10 @@ async function finalizarGravacao(){
     /// Texto completo da consulta
     const fullText = transcriptChunks.join(" ");
 
+    // Exibe o status SOAP
+    const statusEl = document.getElementById("soapStatus");
+    statusEl.style.display = "block";
+
     // Gera a última versão SOAP
     const soap = await gerarNotaSOAP(fullText);
 
@@ -802,6 +823,7 @@ async function finalizarGravacao(){
       }
 
       editor.setContent(novoConteudo);
+      statusEl.style.display = "none";
     }
 
     // --- NOVO: categorização automática via backend ---
@@ -818,7 +840,6 @@ async function finalizarGravacao(){
     }
 
     await window.clinbotPrimeiraAnalise();
-
   }
 }
 
