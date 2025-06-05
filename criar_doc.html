@@ -374,6 +374,8 @@ if (/^##\s+/.test(line) || /^###\s+/.test(line)) {
     window.salvarDocumento = async function () {
       const tipo        = document.getElementById("tipo").value;
       const htmlContent = tinymce.get("editor").getContent().trim();
+      // Remove an initial empty paragraph if present
+      const cleanedHtmlContent = htmlContent.replace(/^\s*<p><br><\/p>/i, '');
 
       /* texto bruto (mantém quebras de linha) */
       const rawText     = tinymce.get("editor").getContent({ format:"text" }).trim();
@@ -475,16 +477,16 @@ try {
 
 const wrapper = document.createElement("div");
 wrapper.innerHTML = styleFix + `
-  <header style="text-align:center;margin-bottom:20px;">
+  <header style="text-align:center;margin-bottom:5px;">
     <h2 style="margin:0;">${tipo.charAt(0).toUpperCase()+tipo.slice(1)}</h2>
     <p style="margin:0;font-size:14px;line-height:1.4;">
       Paciente: <strong>${nomePaciente}</strong><br>
       Médico: <strong>${nomeMedico}</strong><br>
       Data: <strong>${dataParte.replace(/-/g,"/")}</strong> • Hora: <strong>${horaParte.replace("-",":")}</strong>
     </p>
-    <hr style="margin-top:15px">
+    <hr style="margin-top:10px">
   </header>
-  <div style="text-align:justify;">${htmlContent}</div>
+  <div style="text-align:justify;">${cleanedHtmlContent}</div>
 `;
 
         const pdfBlob = await html2pdf().from(wrapper).set({
