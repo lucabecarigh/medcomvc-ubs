@@ -488,7 +488,7 @@ wrapper.innerHTML = styleFix + `
 `;
 
         const pdfBlob = await html2pdf().from(wrapper).set({
-          margin: [0, 0.3],           // top/bot 0in, left/right 0.3in
+          margin: [0.2, 0.4],           // top/bot 0in, left/right 0.3in
           filename: nomePDF,
           image: { type: "jpeg", quality: 0.98 },
           html2canvas: {
