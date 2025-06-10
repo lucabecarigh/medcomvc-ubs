@@ -96,9 +96,7 @@
   <textarea id="clinbotQuestion" placeholder="Pergunte algo ao Clinbot..." hidden></textarea>
   <div class="center"><button id="clinbotAskBtn" onclick="clinbotPerguntar()" hidden>Enviar pergunta</button></div>
 
-  <!-- Gerador de PDF -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
-
+  
   <!-- Firebase + OpenAI + toda a lógica -->
   <script type="module">
     /* ---------- Firebase ---------- */
@@ -120,6 +118,10 @@ const firebaseConfig = {
     const db      = getFirestore(app);
     const storage = getStorage(app, "gs://medcomvc-ubs.firebasestorage.app");
 
+    /* ---------- Templates ---------- */
+    const TEMPLATE_GERAL      = "assets/templates/template_geral.html";
+    const TEMPLATE_TRATAMENTO = "assets/templates/template_tratamento.html";
+
     /* ---------- BASE da API ----------
    • Usa 127.0.0.1 apenas se você estiver rodando localmente.
    • Para QUALQUER outro hostname (inclusive www.med.com.vc), usa o backend público. */
@@ -140,38 +142,6 @@ Telefone (31) 3718-6285`;
 
     const HEADER_HTML = HEADER_TEXT_RAW.replace(/\n/g, '<br>');
 
-    /* ---------- Rodapé padrão para Tratamento ---------- */
-    const TREATMENT_FOOTER_HTML = `
-<div id="rodapeTratamento" class="mceNonEditable" style="margin-top:30px;display:flex;justify-content:space-between;gap:20px;">
-  <div style="white-space:pre-wrap;flex:1;">
-    <strong>COMPRADOR</strong><br>
-    Nome:<br>
-    RG:<br>
-    Órgão Emissor:<br>
-    Endereço:<br>
-    Cidade:<br>
-    Estado:<br>
-    Telefone:
-  </div>
-  <div style="white-space:pre-wrap;flex:1;">
-    <strong>FORNECEDOR</strong><br><br>
-    Assinatura do Farmacêutico:<br><br><br>
-    Data: ___/___/___
-  </div>
-</div>`;
-
-    /* Insere rodapé padrão de tratamento (evita duplicar usando id) */
-    function insertTreatmentFooter(){
-      const editor = tinymce.get('editor');
-      if(!editor) return;
-
-      // evita duplicar usando id
-      if(editor.getContent().includes('rodapeTratamento')) return;
-
-      // coloca o rodapé DEPOIS do conteúdo já existente
-      const current = editor.getContent();
-      editor.setContent(current + '<p><br></p>' + TREATMENT_FOOTER_HTML);
-    }
 
     /* ---------- Variáveis globais ---------- */
     const pacienteId = localStorage.getItem("pacienteSelecionado");
@@ -280,94 +250,46 @@ if (/^##\s+/.test(line) || /^###\s+/.test(line)) {
       height: 500,
       menubar: false,
       plugins: 'lists image noneditable',
-      toolbar: 'undo redo | bold italic underline | bullist numlist | image',
+      toolbar: 'undo redo | bold italic underline | bullist numlist',
       external_plugins: {
   noneditable: "https://cdn.jsdelivr.net/npm/tinymce@6.8.3/plugins/noneditable/index.min.js"
 },
       branding: false,
       automatic_uploads: true,
-      images_upload_url: 'postAcceptor.php', // não usado, mas necessário
+
+
+
+      
+      content_style:`body{font-family:Helvetica,Arial,sans-serif;font-size:12pt;line-height:1.4;text-align:justify;padding:20px;}
+p,li{margin:0 0 10px 0;}
+img{max-width:100%;height:auto;}`,
       setup: function (editor) {
         editor.on('init', function () {
           const presetParam = new URLSearchParams(window.location.search).get('preset');
           if (presetParam) {
-          const key   = 'auto_' + presetParam;
-          const saved = localStorage.getItem(key);
+            const key   = 'auto_' + presetParam;
+            const saved = localStorage.getItem(key);
 
-          if (saved) {
-            editor.setContent(saved.replace(/\n/g, '<br>')); // converte \n em <br>
-            console.log('Conteúdo aplicado ao TinyMCE (' + key + '):',
-                        saved.slice(0,120) + (saved.length>120?'…':''));
-            localStorage.removeItem(key);
-          } else {
-            console.log('Nenhum conteúdo encontrado para', key);
-          }
-          }
-          /* ---------- Cabeçalho padrão (não‑editável) ---------- */
-          const headerBlock =
-            '<div id="cabecalhoPadrao" class="mceNonEditable" style="text-align:center;">'
-            + HEADER_HTML +
-            '</div><p><br></p>';
-
-          const textoAtual = editor.getContent({format:'text'});
-          if(!textoAtual.includes('MUNICÍPIO DE SANTANA DO RIACHO')){
-            editor.setContent(headerBlock + editor.getContent());
-          }
-
-          /* ---------- Rodapé para Tratamento ---------- */
-          if(document.getElementById('tipo').value === 'tratamento'){
-            insertTreatmentFooter();
+            if (saved) {
+              editor.setContent(saved.replace(/\n/g, '<br>')); // converte \n em <br>
+              console.log('Conteúdo aplicado ao TinyMCE (' + key + '):',
+                          saved.slice(0,120) + (saved.length>120?'…':''));
+              localStorage.removeItem(key);
+            } else {
+              console.log('Nenhum conteúdo encontrado para', key);
+            }
           }
         });
-      },
-
-
-
-      images_upload_handler: async function (blobInfo, success, failure) {
-        try {
-          const file     = blobInfo.blob();
-          const filename = `imagem_${Date.now()}.jpg`;
-          const caminho  = `pacientes/${pacienteId}/imagens/${filename}`;
-          const storageRef = ref(storage, caminho);
-          await uploadBytes(storageRef, file);
-          const url = await getDownloadURL(storageRef);
-          success(url);
-        } catch (err) {
-          console.error("Erro no upload da imagem:", err);
-          failure("Erro ao enviar imagem.");
-        }
-      },
-      file_picker_types: 'image',
-      file_picker_callback: function (callback, value, meta) {
-        if (meta.filetype === 'image') {
-          const input = document.createElement('input');
-          input.type = 'file';
-          input.accept = 'image/*';
-          input.onchange = function () {
-            const file   = this.files[0];
-            const reader = new FileReader();
-            reader.onload = function () {
-              const id        = 'blobid' + Date.now();
-              const blobCache = tinymce.activeEditor.editorUpload.blobCache;
-              const base64    = reader.result.split(',')[1];
-              const blobInfo  = blobCache.create(id, file, base64);
-              blobCache.add(blobInfo);
-              callback(blobInfo.blobUri(), { title: file.name });
-            };
-            reader.readAsDataURL(file);
-          };
-          input.click();
-        }
-      },
-      content_style:`body{font-family:Helvetica,Arial,sans-serif;font-size:14px;padding:20px;}img{max-width:100%;height:auto;}`
-    });
-
-    /* Adiciona rodapé automaticamente quando o tipo mudar para tratamento */
-    document.getElementById('tipo').addEventListener('change',function(){
-      if(this.value === 'tratamento'){
-        insertTreatmentFooter();
+        // Justifica todo novo parágrafo inserido
+        editor.on('NodeChange', function(e){
+          if(e && e.element && e.element.nodeName==='P'){
+            e.element.style.textAlign = 'justify';
+            e.element.style.fontSize  = '12pt';
+          }
+        });
       }
     });
+
 
 
     /* ---------- Salvar documento (PDF + Firestore) ---------- */
@@ -443,77 +365,56 @@ if (/^##\s+/.test(line) || /^###\s+/.test(line)) {
 
         /* ----- CSS inline para evitar corte de linhas ----- */
         const styleFix = `
-          <style>
-            h1, h2, h3, h4, h5, h6, p, li {
-              page-break-inside: avoid;
+    <style>
+      body,p,li{font-size:12pt;line-height:1.4;text-align:justify;}
+      h1,h2,h3,h4,h5,h6,p,li{page-break-inside:avoid;}
+    </style>`;
+
+        // Obter nomes
+        let nomePaciente = pacienteId;   // fallback = UID
+        let nomeMedico   = medicoId;     // fallback = UID
+
+        try {
+          /* ------------ nome do paciente ------------ */
+          const pacSnap = await getDoc(doc(db, "pacientes", pacienteId));
+          if (pacSnap.exists()) {
+            const identPac = pacSnap.data().identificacao;           // array?
+            if (Array.isArray(identPac) && identPac[0]?.nome) {
+              nomePaciente = identPac[0].nome;
             }
-          </style>`;
-
-      /* ——— cabeçalho bonito + conteúdo original do TinyMCE ——— */
-let nomePaciente = pacienteId;   // fallback = UID
-let nomeMedico   = medicoId;     // fallback = UID
-
-try {
-  /* ------------ nome do paciente ------------ */
-  const pacSnap = await getDoc(doc(db, "pacientes", pacienteId));
-  if (pacSnap.exists()) {
-    const identPac = pacSnap.data().identificacao;           // array?
-    if (Array.isArray(identPac) && identPac[0]?.nome) {
-      nomePaciente = identPac[0].nome;
-    }
-  }
-
-  /* ------------ nome do médico --------------- */
-  const medSnap = await getDoc(doc(db, "medicos", medicoId));
-  if (medSnap.exists()) {
-    const identMed = medSnap.data().identificacao;           // array?
-    if (Array.isArray(identMed) && identMed[0]?.nome) {
-      nomeMedico = identMed[0].nome;
-    }
-  }
-} catch (err) {
-  console.warn("Falha ao obter nomes:", err); // mantém UID se der erro
-}
-
-const wrapper = document.createElement("div");
-wrapper.innerHTML = styleFix + `
-  <header style="text-align:center;margin-bottom:5px;">
-    <h2 style="margin:0;">${tipo.charAt(0).toUpperCase()+tipo.slice(1)}</h2>
-    <p style="margin:0;font-size:14px;line-height:1.4;">
-      Paciente: <strong>${nomePaciente}</strong><br>
-      Médico: <strong>${nomeMedico}</strong><br>
-      Data: <strong>${dataParte.replace(/-/g,"/")}</strong> • Hora: <strong>${horaParte.replace("-",":")}</strong>
-    </p>
-    <hr style="margin-top:10px">
-  </header>
-  <div style="text-align:justify;">${cleanedHtmlContent}</div>
-`;
-
-        const pdfBlob = await html2pdf().from(wrapper).set({
-          margin: [0.2, 0.4],           // top/bot 0in, left/right 0.3in
-          filename: nomePDF,
-          image: { type: "jpeg", quality: 0.98 },
-          html2canvas: {
-            scale: 2,
-            scrollY: 0                  // garante print do topo
-          },
-          jsPDF: { unit: "in", format: "a4", orientation: "portrait" },
-          pagebreak: {
-            mode: ["avoid-all", "css", "legacy"]
           }
-        }).outputPdf("blob");
 
-        const storageRef = ref(storage, `pacientes/${pacienteId}/${tipo}/${nomePDF}`);
-        await uploadBytes(storageRef, pdfBlob); 
-        const urlPDF = await getDownloadURL(storageRef);
-        const novaAba = window.open(urlPDF, "_blank");
-        // tenta abrir diálogo de impressão quando o PDF carregar
-        if (novaAba) {
-          novaAba.onload = () => {
-            try { novaAba.print(); } catch(e){}
-          };
+          /* ------------ nome do médico --------------- */
+          const medSnap = await getDoc(doc(db, "medicos", medicoId));
+          if (medSnap.exists()) {
+            const identMed = medSnap.data().identificacao;           // array?
+            if (Array.isArray(identMed) && identMed[0]?.nome) {
+              nomeMedico = identMed[0].nome;
+            }
+          }
+        } catch (err) {
+          console.warn("Falha ao obter nomes:", err); // mantém UID se der erro
         }
 
+        /* ---- Geração de PDF no back-end ---- */
+        const respPDF = await fetch(`${API_BASE}/generate_pdf/`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            template: (tipo === "tratamento") ? "tratamento" : "geral",
+            paciente_id: pacienteId,
+            tipo: tipo,
+            nome_pdf: nomePDF,
+            paciente: nomePaciente,
+            medico:   nomeMedico,
+            data:     dataParte.replace(/-/g,"/"),
+            hora:     horaParte.replace("-",":"),
+            conteudo: cleanedHtmlContent
+          })
+        });
+        if (!respPDF.ok) throw new Error(await respPDF.text());
+        const { url } = await respPDF.json();
+        window.open(url, "_blank");  // abre o PDF já salvo no Storage
         alert("Documento salvo com sucesso!");
         window.location.href = "paciente_view.html";
 
