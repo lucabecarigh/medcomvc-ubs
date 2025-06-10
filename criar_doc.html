@@ -130,17 +130,6 @@ const firebaseConfig = {
     ? "http://127.0.0.1:8000"
     : "https://api.med.com.vc";
 
-    /* ---------- Textos padrão ---------- */
-    const HEADER_TEXT_RAW = `MUNICÍPIO DE SANTANA DO RIACHO – MINAS GERAIS
-UBS Teobaldo Inácio da Silva
-
-Secretaria Municipal de Saúde
-CNPJ 18.715.458/0001-92
-Rua José de Azevedo Filho, 55
-Centro (35845-000)
-Telefone (31) 3718-6285`;
-
-    const HEADER_HTML = HEADER_TEXT_RAW.replace(/\n/g, '<br>');
 
 
     /* ---------- Variáveis globais ---------- */
@@ -249,18 +238,10 @@ if (/^##\s+/.test(line) || /^###\s+/.test(line)) {
       selector: '#editor',
       height: 500,
       menubar: false,
-      plugins: 'lists image noneditable',
       toolbar: 'undo redo | bold italic underline | bullist numlist',
-      external_plugins: {
-  noneditable: "https://cdn.jsdelivr.net/npm/tinymce@6.8.3/plugins/noneditable/index.min.js"
-},
       branding: false,
       automatic_uploads: true,
-
-
-
-      
-      content_style:`body{font-family:Helvetica,Arial,sans-serif;font-size:12pt;line-height:1.4;text-align:justify;padding:20px;}
+      content_style: `body{font-family:Helvetica,Arial,sans-serif;font-size:12pt;line-height:1.4;text-align:justify;padding:20px;}
 p,li{margin:0 0 10px 0;}
 img{max-width:100%;height:auto;}`,
       setup: function (editor) {
