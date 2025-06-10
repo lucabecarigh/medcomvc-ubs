@@ -290,10 +290,32 @@ img{max-width:100%;height:auto;}`,
       }
     });
 
+  
+        /* === Limite de caracteres para TRATAMENTO ================================= */
+    const MAX_CHARS_TRATAMENTO = 1600;      // ajuste fino? ±50 p/ garantia
+
+    function validaTratamento() {
+      const tipo = document.getElementById("tipo").value;
+      if (tipo !== "tratamento") return true;                // só valida receita
+
+      const plain = tinymce.get("editor")
+                          .getContent({format: "text"})
+                          .trim();                          // mantém \n e espaço
+      if (plain.length > MAX_CHARS_TRATAMENTO) {
+        alert(`O texto possui ${plain.length} caracteres.
+    Limite para caber em 1 página: ${MAX_CHARS_TRATAMENTO}.
+    Reduza o conteúdo (ou abra outra receita).`);
+        return false;
+      }
+      return true;
+    }
+
 
 
     /* ---------- Salvar documento (PDF + Firestore) ---------- */
     window.salvarDocumento = async function () {
+      if (!validaTratamento()) return;        // ← NÃO gera PDF se exceder
+
       const tipo        = document.getElementById("tipo").value;
       const htmlContent = tinymce.get("editor").getContent().trim();
       // Remove an initial empty paragraph if present
