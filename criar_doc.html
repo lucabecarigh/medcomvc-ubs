@@ -66,6 +66,9 @@
   <div id="editor-container">
     <textarea id="editor"></textarea>
   </div>
+  <div style="text-align:right; max-width:1000px; margin:4px auto 0;">
+    <small id="charCount">0 / 1500&nbsp;caracteres</small>
+  </div>
   <div id="soapStatus" style="text-align:center; margin:10px 0; display:none; font-style:italic; color:#555;">⏳ Gerando SOAP...</div>
 
 <!-- Gravador de áudio -->
@@ -117,6 +120,8 @@ const firebaseConfig = {
     const app     = initializeApp(firebaseConfig);
     const db      = getFirestore(app);
     const storage = getStorage(app, "gs://medcomvc-ubs.firebasestorage.app");
+    /* ---------- Limite “seguro” de caracteres ---------- */
+    const MAX_CHARS = 1500;        // cabe no template com folga
 
     /* ---------- Templates ---------- */
     const TEMPLATE_GERAL      = "assets/templates/template_geral.html";
@@ -268,6 +273,20 @@ img{max-width:100%;height:auto;}`,
             e.element.style.fontSize  = '12pt';
           }
         });
+
+        // conta caracteres sempre que o usuário digitar
+        editor.on('KeyUp change', updateCount);
+
+        function updateCount(){
+          const txt = editor.getContent({format:'text'}).replace(/\s+/g,' ');
+          const n   = txt.length;
+          document.getElementById('charCount').textContent =
+                `${n} / ${MAX_CHARS} caracteres`;
+          // cor de aviso
+          document.getElementById('charCount').style.color =
+                n > MAX_CHARS ? 'red' : '#555';
+        }
+
       }
     });
 
@@ -285,6 +304,14 @@ img{max-width:100%;height:auto;}`,
 
       /* versão compacta (sem quebras) usada para salvar no Firestore */
       const plainText   = rawText.replace(/\s+/g, " ").trim();
+      
+      /* ——— bloqueia textos muito longos ——— */
+      if (plainText.length > MAX_CHARS) {
+        alert(`O texto tem ${plainText.length} caracteres.\n` +
+              `O limite seguro é ${MAX_CHARS}.\n` +
+              `Reduza ou divida a receita em duas partes.`);
+        return;
+      }
 
       if (!pacienteId || !tipo || !htmlContent || !medicoId) {
         alert("Preencha o conteúdo e escolha uma pasta.");
