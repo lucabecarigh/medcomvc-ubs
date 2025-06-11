@@ -53,6 +53,8 @@
   <div class="center">
     <label for="tipo">Escolha a pasta:</label>
     <select id="tipo">
+      <span id="charInfo"
+      style="font-size:.9em;color:#555;margin-left:10px;"></span>
       <option value="prontuario">Prontuário</option>
       <option value="resumo">Resumo</option>
       <option value="exame">Exame</option>
@@ -287,35 +289,18 @@ img{max-width:100%;height:auto;}`,
             e.element.style.fontSize  = '12pt';
           }
         });
+        // ===== Validação por altura: atualiza em cada digitação
+        editor.on('input', atualizarAltura);
+        atualizarAltura();
       }
     });
 
-      /* Converte px → mm (96 px ≈ 25,4 mm) */
-      const PX_TO_MM = 25.4 / 96;
+    
 
-      /* Espaço útil do <main>: 247 mm (page) – 48 mm (cabeçalho) – 59 mm (rodapé) ≈ 140 mm  */
-      const ALTURA_MAX_MM = 140;
+      
 
-      /* Mede a altura (em mm) do HTML que está no editor e diz se cabe */
-      function cabeEmUmaPagina(html) {
-        const probe = document.createElement("div");
-        Object.assign(probe.style, {
-          width: "180mm",                       // 210 – 2×15 mm de margem lateral
-          fontFamily: '"Times New Roman",serif',
-          fontSize: "12pt",
-          lineHeight: "1.4",
-          position: "absolute",
-          visibility: "hidden",
-          whiteSpace: "normal",
-        });
-        probe.innerHTML = html;
-        document.body.appendChild(probe);
-
-        const alturaMm = probe.scrollHeight * PX_TO_MM;
-        document.body.removeChild(probe);
-
-        return { ok: alturaMm <= ALTURA_MAX_MM, alturaMm };
-      }
+      /* – atualiza em cada digitação e na troca do seletor – */
+      document.getElementById("tipo").addEventListener("change", atualizarAltura);
 
   
 
@@ -324,7 +309,7 @@ img{max-width:100%;height:auto;}`,
 
     /* ---------- Salvar documento (PDF + Firestore) ---------- */
     window.salvarDocumento = async function () {
-      if (!validaTratamento()) return;        // ← NÃO gera PDF se exceder
+  
 
       const tipo        = document.getElementById("tipo").value;
       const htmlContent = tinymce.get("editor").getContent().trim();
@@ -832,39 +817,7 @@ async function categorizarTranscricao(texto) {
 
   </script>
 
-  <script>
-    /* --- TESTE AUTOMÁTICO ---------------------------------------------------- */
-    /* Use no console: findLimit(2500)  → devolve quantos caracteres cabem       */
-    
-    window.findLimit = async function(maxChars = 2500) {
-      const editor = tinymce.get('editor');
-      if (!editor) return console.warn("Editor ainda não carregou.");
-    
-      let baixo = 0, alto = maxChars, melhor = 0;
-    
-      /* Busca binária: em ~12 tentativas acha o ponto exato                */
-      while (baixo <= alto) {
-        const meio = Math.floor((baixo + alto) / 2);
-    
-        /* cria um texto fictício com 'meio' caracteres e marca parágrafos  */
-        const lorem = "X".repeat(meio).replace(/X{70}/g, "$&<br>"); // quebra de 70 em 70
-        editor.setContent(lorem);
-    
-        const { ok } = cabeEmUmaPagina(editor.getContent());
-        if (ok) {                       // ainda cabe → tenta crescer
-          melhor = meio;
-          baixo  = meio + 1;
-        } else {                        // estourou → diminui
-          alto = meio - 1;
-        }
-        await new Promise(r => setTimeout(r, 20)); // deixa o editor atualizar
-      }
-    
-      console.log(`Limite encontrado: ${melhor} caracteres.`);
-      alert(`Limite encontrado: ${melhor} caracteres.`);
-      return melhor;
-    };
-    </script>
+
 
 
   
