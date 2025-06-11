@@ -53,14 +53,13 @@
   <div class="center">
     <label for="tipo">Escolha a pasta:</label>
     <select id="tipo">
-      <span id="charInfo"
-      style="font-size:.9em;color:#555;margin-left:10px;"></span>
       <option value="prontuario">Prontuário</option>
       <option value="resumo">Resumo</option>
       <option value="exame">Exame</option>
       <option value="tratamento">Tratamento</option>
       <option value="documento">Documento</option>
     </select>
+    <span id="charInfo" style="font-size:.9em;color:#555;margin-left:10px;"></span>
 
   </div>
 
@@ -245,17 +244,17 @@ if (/^##\s+/.test(line) || /^###\s+/.test(line)) {
   closeList();
   return html;
 }
-
+/* --- evita erro até termos a lógica de altura --- */
+function atualizarAltura() {
+  // por enquanto não faz nada
+}
     /* ---------- TinyMCE ---------- */
     tinymce.init({
       selector: '#editor',
       height: 500,
       menubar: false,
-      plugins: 'lists image noneditable',
+      plugins: 'lists image',
       toolbar: 'undo redo | bold italic underline | bullist numlist',
-      external_plugins: {
-  noneditable: "https://cdn.jsdelivr.net/npm/tinymce@6.8.3/plugins/noneditable/index.min.js"
-},
       branding: false,
       automatic_uploads: true,
 
@@ -283,26 +282,30 @@ img{max-width:100%;height:auto;}`,
           }
         });
         // Justifica todo novo parágrafo inserido
-        editor.on('NodeChange', function(e){
-          if(e && e.element && e.element.nodeName==='P'){
+        editor.on('NodeChange', function (e) {
+          if (e && e.element && e.element.nodeName === 'P') {
             e.element.style.textAlign = 'justify';
-            e.element.style.fontSize  = '12pt';
+            e.element.style.fontSize = '12pt';
           }
         });
-        // ===== Validação por altura: atualiza em cada digitação
+
+        // — atualiza barra de altura a cada digitação —
         editor.on('input', atualizarAltura);
         atualizarAltura();
-      }
-    });
 
-    
+              
+            editor.on('change', function () {
+                const content = editor.getContent({ format: 'text' }).trim();
+                const charCount = content.length;
+                document.getElementById("charInfo").textContent = `Caracteres: ${charCount}`;
+                if (charCount > 10000) {
+                  alert("O conteúdo está muito longo! Considere resumir.");
+                }
+              });
+            }
+          });   
 
-      
 
-      /* – atualiza em cada digitação e na troca do seletor – */
-      document.getElementById("tipo").addEventListener("change", atualizarAltura);
-
-  
 
 
 
@@ -310,7 +313,7 @@ img{max-width:100%;height:auto;}`,
     /* ---------- Salvar documento (PDF + Firestore) ---------- */
     window.salvarDocumento = async function () {
   
-
+    
       const tipo        = document.getElementById("tipo").value;
       const htmlContent = tinymce.get("editor").getContent().trim();
       // Remove an initial empty paragraph if present
@@ -821,5 +824,5 @@ async function categorizarTranscricao(texto) {
 
 
   
-</body>
+  </body>
 </html>
